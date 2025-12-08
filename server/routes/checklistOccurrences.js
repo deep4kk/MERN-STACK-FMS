@@ -522,118 +522,165 @@ router.get('/person-dashboard', authenticateToken, async (req, res) => {
         select: 'name frequency category'
       })
       .sort({ dueDate: 1 })
-      .lean(); // Use lean() for better performance
+      .lean();
+
+    // Helper function to safely convert ObjectId to string
+    const toIdString = (value) => {
+      if (!value) return null;
+      if (typeof value === 'string') return value;
+      if (value && typeof value === 'object' && value.toString) {
+        return value.toString();
+      }
+      return String(value);
+    };
+
+    // Helper function to safely get date string
+    const getDateString = (dateValue) => {
+      if (!dateValue) return null;
+      if (dateValue instanceof Date) {
+        if (isNaN(dateValue.getTime())) return null;
+        return dateValue.toISOString().split('T')[0];
+      }
+      try {
+        const date = new Date(dateValue);
+        if (isNaN(date.getTime())) return null;
+        return date.toISOString().split('T')[0];
+      } catch (e) {
+        return null;
+      }
+    };
 
     // Group by user
     const userMap = new Map();
     
-    occurrences.forEach(occ => {
-      // Handle assignedTo - could be ObjectId or populated object
-      let userId, userName, userEmail;
-      
-      if (occ.assignedTo) {
-        if (typeof occ.assignedTo === 'object' && occ.assignedTo._id) {
-          userId = occ.assignedTo._id.toString();
-          userName = occ.assignedTo.username || 'Unknown';
-          userEmail = occ.assignedTo.email || '';
-        } else {
-          userId = occ.assignedTo.toString();
-          userName = 'Unknown';
-          userEmail = '';
-        }
-      } else {
-        // Skip if no assignedTo
-        return;
-      }
-      
-      if (!userId) return; // Skip if still no userId
-      
-      if (!userMap.has(userId)) {
-        userMap.set(userId, {
-          userId,
-          userName,
-          email: userEmail,
-          checklists: [],
-          calendar: new Map() // date -> { completed: 0, pending: 0 }
-        });
-      }
-      
-      const userData = userMap.get(userId);
-      
-      // Handle dueDate - ensure it's a valid date
-      let dateKey;
+    for (const occ of occurrences) {
       try {
-        const dueDate = occ.dueDate instanceof Date ? occ.dueDate : new Date(occ.dueDate);
-        if (isNaN(dueDate.getTime())) {
-          return; // Skip invalid dates
+        // Handle assignedTo - could be ObjectId or populated object
+        let userId, userName, userEmail;
+        
+        if (occ.assignedTo) {
+          if (typeof occ.assignedTo === 'object' && occ.assignedTo._id) {
+            userId = toIdString(occ.assignedTo._id);
+            userName = occ.assignedTo.username || 'Unknown';
+            userEmail = occ.assignedTo.email || '';
+          } else if (typeof occ.assignedTo === 'object' && occ.assignedTo.toString) {
+            // Might be an ObjectId directly
+            userId = toIdString(occ.assignedTo);
+            userName = 'Unknown';
+            userEmail = '';
+          } else {
+            userId = toIdString(occ.assignedTo);
+            userName = 'Unknown';
+            userEmail = '';
+          }
+        } else {
+          // Skip if no assignedTo
+          continue;
         }
-        dateKey = dueDate.toISOString().split('T')[0];
-      } catch (dateError) {
-        console.error('Invalid date for occurrence:', occ._id, dateError);
-        return; // Skip occurrences with invalid dates
+        
+        if (!userId) continue; // Skip if still no userId
+        
+        if (!userMap.has(userId)) {
+          userMap.set(userId, {
+            userId,
+            userName,
+            email: userEmail,
+            checklists: [],
+            calendar: new Map() // date -> { completed: 0, pending: 0 }
+          });
+        }
+        
+        const userData = userMap.get(userId);
+        
+        // Handle dueDate - ensure it's a valid date
+        const dateKey = getDateString(occ.dueDate);
+        if (!dateKey) {
+          console.warn('Skipping occurrence with invalid date:', toIdString(occ._id));
+          continue;
+        }
+        
+        // Initialize calendar day if not exists
+        if (!userData.calendar.has(dateKey)) {
+          userData.calendar.set(dateKey, { completed: 0, pending: 0, total: 0 });
+        }
+        
+        const dayData = userData.calendar.get(dateKey);
+        dayData.total++;
+        
+        if (occ.status === 'completed') {
+          dayData.completed++;
+        } else {
+          dayData.pending++;
+        }
+        
+        // Group checklists by template
+        const templateName = (occ.templateId?.name || occ.templateName || 'Unknown').toString();
+        const frequency = (occ.templateId?.frequency || 'unknown').toString();
+        const category = (occ.templateId?.category || occ.category || 'General').toString();
+        
+        let checklistGroup = userData.checklists.find(
+          c => c.templateName === templateName && c.frequency === frequency
+        );
+        
+        if (!checklistGroup) {
+          checklistGroup = {
+            templateName,
+            frequency,
+            category,
+            occurrences: [],
+            totalCount: 0,
+            completedCount: 0,
+            pendingCount: 0
+          };
+          userData.checklists.push(checklistGroup);
+        }
+        
+        const dueDateStr = getDateString(occ.dueDate) || new Date().toISOString().split('T')[0];
+        
+        checklistGroup.occurrences.push({
+          _id: toIdString(occ._id),
+          dueDate: dueDateStr,
+          status: occ.status || 'pending',
+          progressPercentage: occ.progressPercentage || 0
+        });
+        
+        checklistGroup.totalCount++;
+        if (occ.status === 'completed') {
+          checklistGroup.completedCount++;
+        } else {
+          checklistGroup.pendingCount++;
+        }
+      } catch (occError) {
+        console.error('Error processing occurrence:', toIdString(occ?._id), occError);
+        // Continue with next occurrence
+        continue;
       }
-      
-      // Initialize calendar day if not exists
-      if (!userData.calendar.has(dateKey)) {
-        userData.calendar.set(dateKey, { completed: 0, pending: 0, total: 0 });
-      }
-      
-      const dayData = userData.calendar.get(dateKey);
-      dayData.total++;
-      
-      if (occ.status === 'completed') {
-        dayData.completed++;
-      } else {
-        dayData.pending++;
-      }
-      
-      // Group checklists by template
-      const templateName = (occ.templateId?.name || occ.templateName || 'Unknown').toString();
-      const frequency = (occ.templateId?.frequency || 'unknown').toString();
-      const category = (occ.templateId?.category || occ.category || 'General').toString();
-      
-      let checklistGroup = userData.checklists.find(
-        c => c.templateName === templateName && c.frequency === frequency
-      );
-      
-      if (!checklistGroup) {
-        checklistGroup = {
-          templateName,
-          frequency,
-          category,
-          occurrences: [],
-          totalCount: 0,
-          completedCount: 0,
-          pendingCount: 0
-        };
-        userData.checklists.push(checklistGroup);
-      }
-      
-      checklistGroup.occurrences.push({
-        _id: occ._id.toString(),
-        dueDate: occ.dueDate instanceof Date ? occ.dueDate.toISOString() : occ.dueDate,
-        status: occ.status || 'pending',
-        progressPercentage: occ.progressPercentage || 0
-      });
-      
-      checklistGroup.totalCount++;
-      if (occ.status === 'completed') {
-        checklistGroup.completedCount++;
-      } else {
-        checklistGroup.pendingCount++;
-      }
-    });
+    }
     
     // Convert calendar maps to arrays and sort
     const result = Array.from(userMap.values()).map(userData => {
-      const calendarArray = Array.from(userData.calendar.entries())
-        .map(([date, data]) => ({ date, ...data }))
-        .sort((a, b) => a.date.localeCompare(b.date));
-      
-      return {
-        ...userData,
-        calendar: calendarArray
-      };
+      try {
+        const calendarArray = Array.from(userData.calendar.entries())
+          .map(([date, data]) => ({ date, ...data }))
+          .sort((a, b) => a.date.localeCompare(b.date));
+        
+        return {
+          userId: userData.userId,
+          userName: userData.userName,
+          email: userData.email,
+          checklists: userData.checklists,
+          calendar: calendarArray
+        };
+      } catch (mapError) {
+        console.error('Error mapping user data:', userData.userId, mapError);
+        return {
+          userId: userData.userId,
+          userName: userData.userName || 'Unknown',
+          email: userData.email || '',
+          checklists: [],
+          calendar: []
+        };
+      }
     });
 
     res.json({

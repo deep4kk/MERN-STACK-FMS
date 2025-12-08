@@ -43,6 +43,7 @@ import ChecklistPersonDashboard from './pages/ChecklistPersonDashboard';
 import FMSDashboard from './pages/FMSDashboard';
 import SuperAdminManagement from './pages/SuperAdminManagement';
 import Profile from './pages/Profile';
+import MISReport from './pages/MISReport';
 import UpdateNotification from './components/UpdateNotification';
 import { useVersionCheck } from './hooks/useVersionCheck';
 
@@ -104,6 +105,7 @@ function AppContent() {
                   <Route path="fms-categories" element={<ProtectedRoute requireAdmin><CategoryManagement type="fms" /></ProtectedRoute>} />
                   <Route path="checklist-categories" element={<ProtectedRoute requireAdmin><CategoryManagement type="checklist" /></ProtectedRoute>} />
                   <Route path="super-admin-management" element={<ProtectedRoute requireSuperAdmin><SuperAdminManagement /></ProtectedRoute>} />
+                  <Route path="mis-report" element={<ProtectedRoute requireSuperAdmin><MISReport /></ProtectedRoute>} />
                 </Route>
           </Routes>
         </div>

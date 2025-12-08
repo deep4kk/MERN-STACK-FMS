@@ -48,7 +48,8 @@ import {
   X,
   GripVertical,
   RotateCcw,
-  Save
+  Save,
+  FileText
 } from 'lucide-react';
 
 // Modern AMG Logo Component with Glassmorphism
@@ -259,6 +260,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { section: 'Admin', icon: Shield, label: 'Super Admin Management', path: '/super-admin-management', requireSuperAdmin: true, highlight: true },
     { section: 'Admin', icon: Shield, label: 'Audit Logs', path: '/audit-logs', requireSuperAdmin: true },
     { section: 'Admin', icon: Award, label: 'Score Logs', path: '/score-logs', requireSuperAdmin: true },
+    { section: 'Admin', icon: FileText, label: 'MIS Report', path: '/mis-report', requireSuperAdmin: true, highlight: true },
   ];
 
   // Get default section order from menu items

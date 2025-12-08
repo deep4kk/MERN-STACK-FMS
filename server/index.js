@@ -34,6 +34,7 @@ import complaintRoutes from './routes/complaints.js';
 import stationeryRoutes from './routes/stationery.js';
 import adjustmentLogRoutes from './routes/adjustmentLogs.js';
 import fmsDashboardRoutes from './routes/fmsDashboard.js';
+import misReportRoutes from './routes/misReport.js';
 
 dotenv.config();
 
@@ -326,6 +327,7 @@ app.use('/api/complaints', complaintRoutes);
 app.use('/api/stationery', stationeryRoutes);
 app.use('/api/adjustment-logs', adjustmentLogRoutes);
 app.use('/api/fms-dashboard', fmsDashboardRoutes);
+app.use('/api/mis-report', misReportRoutes);
 
 // Serve frontend in production
 if (config.nodeEnv === 'production') {
