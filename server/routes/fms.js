@@ -258,7 +258,7 @@ router.get('/', async (req, res) => {
 
     const fmsList = await FMS.find(query)
       .populate('createdBy', 'username email')
-      .populate('steps.who', 'username email name')
+      .populate('steps.who', 'username email name designation')
       .sort({ createdAt: -1 }); // Sort by newest first
 
     const formattedList = fmsList.map(fms => {
@@ -313,7 +313,7 @@ router.get('/:fmsId', authenticateToken, async (req, res) => {
       console.log('Searching by MongoDB _id');
       fms = await FMS.findById(idParam)
         .populate('createdBy', 'username email')
-        .populate('steps.who', 'username email name');
+        .populate('steps.who', 'username email name designation');
       console.log('FMS found by _id:', !!fms);
     }
 
@@ -322,7 +322,7 @@ router.get('/:fmsId', authenticateToken, async (req, res) => {
       console.log('Searching by fmsId field');
       fms = await FMS.findOne({ fmsId: idParam })
         .populate('createdBy', 'username email')
-        .populate('steps.who', 'username email name');
+        .populate('steps.who', 'username email name designation');
       console.log('FMS found by fmsId:', !!fms);
     }
 
@@ -497,7 +497,7 @@ router.put('/:id', authenticateToken, isSuperAdmin, upload.array('files', 10), a
 
     const updatedFms = await FMS.findById(fms._id)
       .populate('createdBy', 'username email')
-      .populate('steps.who', 'username email name');
+      .populate('steps.who', 'username email name designation');
 
     res.json({ success: true, message: 'FMS template updated successfully', fms: updatedFms });
   } catch (error) {

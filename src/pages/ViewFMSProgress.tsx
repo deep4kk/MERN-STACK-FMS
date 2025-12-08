@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { CheckSquare, Clock, AlertCircle, Upload, RotateCcw, Printer, ArrowRight, Users, X, FileText } from 'lucide-react';
 import axios from 'axios';
@@ -83,6 +83,46 @@ const ViewFMSProgress: React.FC = () => {
   const [reassignTo, setReassignTo] = useState('');
   const [reassignReason, setReassignReason] = useState('');
   const [reassigning, setReassigning] = useState(false);
+  const [displayMode, setDisplayMode] = useState<'name' | 'designation' | 'both'>('name');
+
+  // Fetch display configuration
+  useEffect(() => {
+    const fetchDisplayConfig = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${address}/api/designations/fms-display-config`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (response.data.success) {
+          setDisplayMode(response.data.config.displayMode);
+        }
+      } catch (error) {
+        console.error('Error fetching display config:', error);
+      }
+    };
+    fetchDisplayConfig();
+  }, []);
+
+  // Format user display based on display mode
+  const formatUserDisplay = useCallback((user: any): string => {
+    if (!user || typeof user !== 'object') {
+      return 'Unknown';
+    }
+
+    const username = user.username || user.name || user.email || '';
+    const designation = user.designation || '';
+
+    if (displayMode === 'name') {
+      return username || 'Unknown';
+    } else if (displayMode === 'designation') {
+      return designation || username || 'Unknown';
+    } else { // both
+      if (designation) {
+        return `${username} - ${designation}`;
+      }
+      return username || 'Unknown';
+    }
+  }, [displayMode]);
 
   useEffect(() => {
     const view = new URLSearchParams(location.search).get('view');
@@ -1035,12 +1075,7 @@ const ViewFMSProgress: React.FC = () => {
                                 <span className="flex items-center gap-1">👤 {(() => {
                                   // Handle both array (backward compatibility) and single who
                                   const whoArray = Array.isArray(task.who) ? task.who : (task.who ? [task.who] : []);
-                                  return whoArray.filter((w: any) => w).map((w: any) => {
-                                    if (typeof w === 'object' && w !== null) {
-                                      return w.username || w.name || w.email || 'Unknown';
-                                    }
-                                    return typeof w === 'string' ? w : 'Unknown';
-                                  }).join(', ');
+                                  return whoArray.filter((w: any) => w).map((w: any) => formatUserDisplay(w)).join(', ');
                                 })()}</span>
                                 {task.plannedDueDate && (
                                   <>
@@ -1127,7 +1162,7 @@ const ViewFMSProgress: React.FC = () => {
                           {task.actualCompletedOn && (
                             <div className="mt-3 p-3 rounded-lg bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30 text-sm text-green-700 dark:text-green-400 flex items-center">
                               <CheckSquare size={16} className="mr-2" />
-                              Completed on {formatDate(task.actualCompletedOn)} by {task.completedBy?.username}
+                              Completed on {formatDate(task.actualCompletedOn)} by {formatUserDisplay(task.completedBy)}
                             </div>
                           )}
                         </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { address } from '../../utils/ipAddress';
 import { useAuth } from '../contexts/AuthContext';
-import { Shield, Calendar, CheckCircle, Trash2, Edit, AlertCircle, RefreshCw, Search, Filter, X, Settings, Link2, Save } from 'lucide-react';
+import { Shield, Calendar, CheckCircle, Trash2, Edit, AlertCircle, RefreshCw, Search, Filter, X, Settings, Link2, Save, User, Eye } from 'lucide-react';
 
 interface ChecklistOccurrence {
     _id: string;
@@ -64,6 +64,350 @@ interface FMSTemplate {
     fmsName: string;
     category: string;
 }
+
+const DesignationManagementTab: React.FC = () => {
+    const [users, setUsers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [editingUser, setEditingUser] = useState<any>(null);
+    const [designationValue, setDesignationValue] = useState('');
+    const [availableDesignations, setAvailableDesignations] = useState<string[]>([]);
+    const [newDesignation, setNewDesignation] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+
+    useEffect(() => {
+        fetchUsers();
+        fetchDesignations();
+    }, []);
+
+    const fetchUsers = async () => {
+        try {
+            setLoading(true);
+            const token = localStorage.getItem('token');
+            const response = await axios.get(`${address}/api/designations/users`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setUsers(response.data.users || []);
+        } catch (error) {
+            console.error('Error fetching users:', error);
+            alert('Failed to fetch users');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchDesignations = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.get(`${address}/api/designations`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setAvailableDesignations(response.data.designations || []);
+        } catch (error) {
+            console.error('Error fetching designations:', error);
+        }
+    };
+
+    const handleEdit = (user: any) => {
+        setEditingUser(user);
+        setDesignationValue(user.designation || '');
+    };
+
+    const handleSave = async () => {
+        if (!editingUser) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            await axios.put(
+                `${address}/api/designations/users/${editingUser._id || editingUser.id}`,
+                { designation: designationValue },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            alert('Designation updated successfully!');
+            setEditingUser(null);
+            setDesignationValue('');
+            fetchUsers();
+            fetchDesignations();
+        } catch (error: any) {
+            alert(error.response?.data?.message || 'Failed to update designation');
+        }
+    };
+
+    const filteredUsers = useMemo(() => {
+        if (!searchQuery) return users;
+        const query = searchQuery.toLowerCase();
+        return users.filter(user =>
+            user.username.toLowerCase().includes(query) ||
+            user.email.toLowerCase().includes(query) ||
+            (user.designation && user.designation.toLowerCase().includes(query))
+        );
+    }, [users, searchQuery]);
+
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20">
+                <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-4"></div>
+                <p className="text-gray-600 font-medium">Loading...</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                    <User className="w-6 h-6 text-purple-600" />
+                    Manage User Designations
+                </h2>
+                <p className="text-sm text-gray-600 mb-6">
+                    Assign and manage designations for users. These designations will be used in FMS templates and progress displays based on your display configuration.
+                </p>
+
+                {/* Search */}
+                <div className="mb-4 relative">
+                    <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                        type="text"
+                        placeholder="Search by username, email, or designation..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    />
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                            <tr>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Username</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Email</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Role</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Designation</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-100">
+                            {filteredUsers.map((user) => (
+                                <tr key={user._id || user.id} className="hover:bg-gray-50">
+                                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{user.username}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-600">{user.email}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-600 capitalize">{user.role}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-600">{user.designation || <span className="text-gray-400 italic">Not set</span>}</td>
+                                    <td className="px-4 py-3">
+                                        <button
+                                            onClick={() => handleEdit(user)}
+                                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                            title="Edit Designation"
+                                        >
+                                            <Edit size={16} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Edit Modal */}
+            {editingUser && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-bold text-gray-900">Edit Designation for {editingUser.username}</h3>
+                            <button
+                                onClick={() => {
+                                    setEditingUser(null);
+                                    setDesignationValue('');
+                                }}
+                                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                <X size={20} className="text-gray-500" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Designation
+                                </label>
+                                <input
+                                    type="text"
+                                    value={designationValue}
+                                    onChange={(e) => setDesignationValue(e.target.value)}
+                                    placeholder="Enter designation (e.g., Manager, Developer, etc.)"
+                                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    list="designations-list"
+                                />
+                                <datalist id="designations-list">
+                                    {availableDesignations.map((desg) => (
+                                        <option key={desg} value={desg} />
+                                    ))}
+                                </datalist>
+                                <p className="text-xs text-gray-500 mt-1">Type to enter a new designation or select from existing ones</p>
+                            </div>
+
+                            <div className="flex gap-2 mt-6">
+                                <button
+                                    onClick={() => {
+                                        setEditingUser(null);
+                                        setDesignationValue('');
+                                    }}
+                                    className="flex-1 px-4 py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleSave}
+                                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 font-medium transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Save size={18} />
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const FMSDisplayConfigTab: React.FC = () => {
+    const [displayMode, setDisplayMode] = useState<'name' | 'designation' | 'both'>('name');
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        fetchConfig();
+    }, []);
+
+    const fetchConfig = async () => {
+        try {
+            setLoading(true);
+            const token = localStorage.getItem('token');
+            const response = await axios.get(`${address}/api/designations/fms-display-config`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (response.data.success) {
+                setDisplayMode(response.data.config.displayMode);
+            }
+        } catch (error) {
+            console.error('Error fetching display config:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSave = async () => {
+        try {
+            setSaving(true);
+            const token = localStorage.getItem('token');
+            const response = await axios.put(
+                `${address}/api/designations/fms-display-config`,
+                { displayMode },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            if (response.data.success) {
+                alert('Display configuration updated successfully!');
+            }
+        } catch (error: any) {
+            alert(error.response?.data?.message || 'Failed to update display configuration');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20">
+                <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-4"></div>
+                <p className="text-gray-600 font-medium">Loading...</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                    <Eye className="w-6 h-6 text-purple-600" />
+                    FMS Display Configuration
+                </h2>
+                <p className="text-sm text-gray-600 mb-6">
+                    Configure how user information is displayed in FMS templates and progress views. This setting only affects the display format and does not change any functionality like "Assigned To" fields.
+                </p>
+
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-3">
+                            Display Mode
+                        </label>
+                        <div className="space-y-3">
+                            <label className="flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-gray-50"
+                                style={{ borderColor: displayMode === 'name' ? '#9333ea' : '#e5e7eb' }}>
+                                <input
+                                    type="radio"
+                                    name="displayMode"
+                                    value="name"
+                                    checked={displayMode === 'name'}
+                                    onChange={(e) => setDisplayMode(e.target.value as any)}
+                                    className="w-4 h-4 text-purple-600 focus:ring-purple-500"
+                                />
+                                <div className="flex-1">
+                                    <div className="font-medium text-gray-900">Employee Name Only</div>
+                                    <div className="text-sm text-gray-600">Show only the username/employee name in FMS templates and progress</div>
+                                </div>
+                            </label>
+
+                            <label className="flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-gray-50"
+                                style={{ borderColor: displayMode === 'designation' ? '#9333ea' : '#e5e7eb' }}>
+                                <input
+                                    type="radio"
+                                    name="displayMode"
+                                    value="designation"
+                                    checked={displayMode === 'designation'}
+                                    onChange={(e) => setDisplayMode(e.target.value as any)}
+                                    className="w-4 h-4 text-purple-600 focus:ring-purple-500"
+                                />
+                                <div className="flex-1">
+                                    <div className="font-medium text-gray-900">Designation Only</div>
+                                    <div className="text-sm text-gray-600">Show only the designation in FMS templates and progress</div>
+                                </div>
+                            </label>
+
+                            <label className="flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-gray-50"
+                                style={{ borderColor: displayMode === 'both' ? '#9333ea' : '#e5e7eb' }}>
+                                <input
+                                    type="radio"
+                                    name="displayMode"
+                                    value="both"
+                                    checked={displayMode === 'both'}
+                                    onChange={(e) => setDisplayMode(e.target.value as any)}
+                                    className="w-4 h-4 text-purple-600 focus:ring-purple-500"
+                                />
+                                <div className="flex-1">
+                                    <div className="font-medium text-gray-900">Both Name and Designation</div>
+                                    <div className="text-sm text-gray-600">Show both username and designation (e.g., "John Doe - Manager")</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 pt-6 border-t border-gray-200">
+                        <button
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="w-full px-4 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            <Save size={18} />
+                            {saving ? 'Saving...' : 'Save Configuration'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const ChecklistFMSConfigTab: React.FC = () => {
     const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
@@ -318,7 +662,7 @@ const ChecklistFMSConfigTab: React.FC = () => {
 
 const SuperAdminManagement: React.FC = () => {
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState<'checklists' | 'fms' | 'fms-config'>('checklists');
+    const [activeTab, setActiveTab] = useState<'checklists' | 'fms' | 'fms-config' | 'designations' | 'display-config'>('checklists');
     const [checklists, setChecklists] = useState<ChecklistOccurrence[]>([]);
     const [fmsProjects, setFmsProjects] = useState<FMSProject[]>([]);
     const [loading, setLoading] = useState(false);
@@ -337,7 +681,7 @@ const SuperAdminManagement: React.FC = () => {
     useEffect(() => {
         if (activeTab === 'checklists') {
             fetchChecklists();
-        } else {
+        } else if (activeTab === 'fms') {
             fetchFMSProjects();
         }
     }, [activeTab]);
@@ -564,6 +908,30 @@ const SuperAdminManagement: React.FC = () => {
                         <div className="flex items-center gap-2">
                             <Settings size={18} />
                             Checklist FMS Config
+                        </div>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('designations')}
+                        className={`px-6 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${activeTab === 'designations'
+                                ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-md'
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                            }`}
+                    >
+                        <div className="flex items-center gap-2">
+                            <User size={18} />
+                            Designations
+                        </div>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('display-config')}
+                        className={`px-6 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${activeTab === 'display-config'
+                                ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-md'
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                            }`}
+                    >
+                        <div className="flex items-center gap-2">
+                            <Eye size={18} />
+                            FMS Display
                         </div>
                     </button>
                 </div>
@@ -831,6 +1199,16 @@ const SuperAdminManagement: React.FC = () => {
                         {/* Checklist FMS Configuration Tab */}
                         {activeTab === 'fms-config' && (
                             <ChecklistFMSConfigTab />
+                        )}
+
+                        {/* Designation Management Tab */}
+                        {activeTab === 'designations' && (
+                            <DesignationManagementTab />
+                        )}
+
+                        {/* FMS Display Configuration Tab */}
+                        {activeTab === 'display-config' && (
+                            <FMSDisplayConfigTab />
                         )}
                     </>
                 )}

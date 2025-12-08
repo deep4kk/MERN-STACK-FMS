@@ -20,6 +20,11 @@ const userSchema = new mongoose.Schema({
     sparse: true,
     trim: true
   },
+  designation: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   profilePicture: {
     type: String,
     default: ''

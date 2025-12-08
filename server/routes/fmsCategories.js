@@ -33,7 +33,7 @@ router.get('/', async (req, res) => {
 
     const fmsList = await FMS.find(query)
       .populate('createdBy', 'username')
-      .populate('steps.who', 'username')
+      .populate('steps.who', 'username designation')
       .sort({ createdAt: -1 });
 
     // Calculate total time for each FMS

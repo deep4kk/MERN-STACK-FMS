@@ -36,32 +36,60 @@ const ViewAllFMS: React.FC = () => {
   const [editingFMS, setEditingFMS] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showPreview, setShowPreview] = useState<FMSTemplate | null>(null);
+  const [displayMode, setDisplayMode] = useState<'name' | 'designation' | 'both'>('name');
 
-  // Format assignee names
-  const formatAssignees = useCallback((who: any): string => {
-    if (!Array.isArray(who)) {
-      // Handle single assignee (new format)
-      if (typeof who === 'object' && who !== null) {
-        return who.username || who.name || who.email || 'N/A';
-      }
-      if (typeof who === 'string') {
-        return who;
-      }
-      return 'N/A';
-    }
-    const names = who
-      .map((w: any) => {
-        if (typeof w === 'object' && w !== null) {
-          return w.username || w.name || w.email || '';
+  // Fetch display configuration
+  useEffect(() => {
+    const fetchDisplayConfig = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${address}/api/designations/fms-display-config`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (response.data.success) {
+          setDisplayMode(response.data.config.displayMode);
         }
-        if (typeof w === 'string') {
-          return w;
-        }
-        return '';
-      })
-      .filter(Boolean);
-    return names.length ? names.join(', ') : 'N/A';
+      } catch (error) {
+        console.error('Error fetching display config:', error);
+      }
+    };
+    fetchDisplayConfig();
   }, []);
+
+  // Format assignee names based on display mode
+  const formatAssignees = useCallback((who: any): string => {
+    const formatSingleUser = (user: any): string => {
+      if (typeof user === 'string') {
+        return user;
+      }
+      if (typeof user !== 'object' || user === null) {
+        return 'N/A';
+      }
+
+      const username = user.username || user.name || user.email || '';
+      const designation = user.designation || '';
+
+      if (displayMode === 'name') {
+        return username || 'N/A';
+      } else if (displayMode === 'designation') {
+        return designation || username || 'N/A';
+      } else { // both
+        if (designation) {
+          return `${username} - ${designation}`;
+        }
+        return username || 'N/A';
+      }
+    };
+
+    if (!Array.isArray(who)) {
+      return formatSingleUser(who);
+    }
+
+    const formatted = who
+      .map(formatSingleUser)
+      .filter(Boolean);
+    return formatted.length ? formatted.join(', ') : 'N/A';
+  }, [displayMode]);
 
   // Get step duration text
   const getStepDuration = useCallback((step: any) => {

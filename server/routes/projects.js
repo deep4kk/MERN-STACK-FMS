@@ -110,7 +110,7 @@ router.post('/', async (req, res) => {
     const { fmsId, projectName, startDate, createdBy } = req.body;
 
     // Get FMS template
-    const fms = await FMS.findById(fmsId).populate('steps.who');
+    const fms = await FMS.findById(fmsId).populate('steps.who', 'username email designation');
     if (!fms) {
       return res.status(404).json({ success: false, message: 'FMS template not found' });
     }
@@ -245,7 +245,7 @@ router.get('/', async (req, res) => {
 
     const projects = await Project.find(query)
       .populate('fmsId', 'fmsName')
-      .populate('tasks.who', 'username email name')
+      .populate('tasks.who', 'username email name designation')
       .populate('tasks.completedBy', 'username email name')
       .populate('createdBy', 'username email name')
       .sort({ createdAt: -1 });
@@ -612,7 +612,7 @@ router.get('/pending-fms-tasks/:userId', async (req, res) => {
     const showAll = isSuperAdmin && userId === 'all';
 
     const projects = await Project.find({ status: { $in: ['Active', 'In Progress'] } })
-      .populate('tasks.who', 'username email phoneNumber')
+      .populate('tasks.who', 'username email phoneNumber designation')
       .populate('fmsId', 'fmsName');
 
     const userPendingTasks = [];
@@ -1060,7 +1060,7 @@ router.post('/:projectId/tasks/:taskIndex/reassign', authenticateToken, async (r
     }
 
     const project = await Project.findOne(buildProjectLookupQuery(projectId))
-      .populate('tasks.who', 'username email name');
+      .populate('tasks.who', 'username email name designation');
     
     if (!project) {
       return res.status(404).json({ success: false, message: 'Project not found' });
@@ -1097,7 +1097,7 @@ router.post('/:projectId/tasks/:taskIndex/reassign', authenticateToken, async (r
     await project.save();
 
     const updatedProject = await Project.findOne(buildProjectLookupQuery(projectId))
-      .populate('tasks.who', 'username email name')
+      .populate('tasks.who', 'username email name designation')
       .populate('fmsId', 'fmsName');
 
     res.json({ 
