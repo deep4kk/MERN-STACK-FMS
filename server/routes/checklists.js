@@ -716,6 +716,76 @@ router.post('/:id/submit', auth, async (req, res) => {
     }
 });
 
+// Get all checklists grouped by person with frequencies (all-time) - Super Admin only
+router.get('/person-wise-assignments', auth, async (req, res) => {
+    try {
+        if (req.user.role !== 'superadmin') {
+            return res.status(403).json({ message: 'Only Super Admins can access this report' });
+        }
+
+        // Get all checklist templates with their assignments
+        const templates = await ChecklistTemplate.find({ status: 'active' })
+            .populate('assignedTo', 'username email department')
+            .lean();
+
+        // Get all checklist occurrences to count actual assignments
+        const occurrences = await ChecklistOccurrence.find({})
+            .populate('templateId', 'name frequency')
+            .populate('assignedTo', 'username email department')
+            .lean();
+
+        // Group by person
+        const personWiseData = {};
+
+        templates.forEach(template => {
+            if (!template.assignedTo) return;
+            
+            const userId = template.assignedTo._id.toString();
+            const username = template.assignedTo.username || 'Unknown';
+            const email = template.assignedTo.email || '';
+            const department = template.assignedTo.department || 'General';
+
+            if (!personWiseData[userId]) {
+                personWiseData[userId] = {
+                    userId,
+                    username,
+                    email,
+                    department,
+                    checklists: []
+                };
+            }
+
+            // Count occurrences for this template
+            const occurrenceCount = occurrences.filter(occ => 
+                occ.templateId && occ.templateId._id.toString() === template._id.toString()
+            ).length;
+
+            personWiseData[userId].checklists.push({
+                templateId: template._id.toString(),
+                templateName: template.name,
+                frequency: template.frequency || 'monthly',
+                category: template.category || 'General',
+                occurrenceCount,
+                status: template.status
+            });
+        });
+
+        // Convert to array and sort by username
+        const result = Object.values(personWiseData)
+            .map(person => ({
+                ...person,
+                checklists: person.checklists.sort((a, b) => a.templateName.localeCompare(b.templateName)),
+                totalChecklists: person.checklists.length
+            }))
+            .sort((a, b) => a.username.localeCompare(b.username));
+
+        res.json(result);
+    } catch (error) {
+        console.error('Error fetching person-wise assignments:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
 // Delete a checklist (Super Admin only)
 router.delete('/:id', auth, async (req, res) => {
     try {
