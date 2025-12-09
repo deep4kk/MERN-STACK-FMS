@@ -4,6 +4,7 @@ import auth from '../middleware/auth.js';
 import ChecklistOccurrence from '../models/ChecklistOccurrence.js';
 import ChecklistTemplate from '../models/ChecklistTemplate.js';
 import Checklist from '../models/Checklist.js';
+import User from '../models/User.js';
 
 const router = express.Router();
 
@@ -727,35 +728,35 @@ router.get('/master', auth, async (req, res) => {
         }
 
         // Get all checklist occurrences with populated data
-        // Use try-catch for populate to handle any populate errors gracefully
-        let checklists;
-        try {
-            checklists = await ChecklistOccurrence.find({})
-                .populate({
-                    path: 'templateId',
-                    select: 'name category frequency createdBy',
-                    populate: {
-                        path: 'createdBy',
-                        select: 'username email',
-                        model: 'User'
-                    }
-                })
-                .populate('assignedTo', 'username email department')
-                .populate('submittedBy', 'username email')
-                .populate('completedBy', 'username email')
-                .sort({ dueDate: -1 })
-                .lean();
-        } catch (populateError) {
-            console.error('Error populating checklist data:', populateError);
-            // Try without nested populate if it fails
-            checklists = await ChecklistOccurrence.find({})
-                .populate('templateId', 'name category frequency')
-                .populate('assignedTo', 'username email department')
-                .populate('submittedBy', 'username email')
-                .populate('completedBy', 'username email')
-                .sort({ dueDate: -1 })
-                .lean();
-        }
+        // Simplified populate - avoid nested populate which can cause issues
+        const checklists = await ChecklistOccurrence.find({})
+            .populate('templateId', 'name category frequency createdBy')
+            .populate('assignedTo', 'username email department')
+            .populate('submittedBy', 'username email')
+            .populate('completedBy', 'username email')
+            .sort({ dueDate: -1 })
+            .lean();
+        
+        // If template has createdBy as ObjectId, populate it separately
+        const templateIds = [...new Set(checklists
+            .map(c => {
+                const template = c.templateId;
+                if (!template) return null;
+                return template._id || template;
+            })
+            .filter(Boolean)
+        )];
+        
+        const templatesWithUsers = await ChecklistTemplate.find({ _id: { $in: templateIds } })
+            .populate('createdBy', 'username email')
+            .lean();
+        
+        const templateUserMap = {};
+        templatesWithUsers.forEach(template => {
+            if (template._id && template.createdBy) {
+                templateUserMap[template._id.toString()] = template.createdBy;
+            }
+        });
 
         // Transform data for frontend with defensive coding
         const transformedChecklists = checklists.map(checklist => {
@@ -767,14 +768,16 @@ router.get('/master', auth, async (req, res) => {
                 const category = checklist.category || (template?.category || 'General');
                 const frequency = template?.frequency || 'N/A';
                 
-                // Get assignedBy - try template's createdBy first, then submittedBy
+                // Get assignedBy - try template's createdBy from map first, then submittedBy
                 let assignedBy = null;
-                if (template?.createdBy) {
-                    if (typeof template.createdBy === 'object' && template.createdBy !== null) {
+                const templateIdStr = template?._id?.toString() || (template ? String(template) : null);
+                if (templateIdStr && templateUserMap[templateIdStr]) {
+                    const createdByUser = templateUserMap[templateIdStr];
+                    if (typeof createdByUser === 'object' && createdByUser !== null) {
                         assignedBy = {
-                            _id: template.createdBy._id?.toString() || template.createdBy.toString(),
-                            username: template.createdBy.username || 'Unknown',
-                            email: template.createdBy.email || ''
+                            _id: createdByUser._id?.toString() || createdByUser.toString(),
+                            username: createdByUser.username || 'Unknown',
+                            email: createdByUser.email || ''
                         };
                     }
                 }
