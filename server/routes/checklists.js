@@ -727,63 +727,143 @@ router.get('/master', auth, async (req, res) => {
         }
 
         // Get all checklist occurrences with populated data
-        const checklists = await ChecklistOccurrence.find({})
-            .populate({
-                path: 'templateId',
-                select: 'name category frequency createdBy',
-                populate: {
-                    path: 'createdBy',
-                    select: 'username email'
-                }
-            })
-            .populate('assignedTo', 'username email department')
-            .populate('submittedBy', 'username email')
-            .populate('completedBy', 'username email')
-            .sort({ dueDate: -1 })
-            .lean();
+        // Use try-catch for populate to handle any populate errors gracefully
+        let checklists;
+        try {
+            checklists = await ChecklistOccurrence.find({})
+                .populate({
+                    path: 'templateId',
+                    select: 'name category frequency createdBy',
+                    populate: {
+                        path: 'createdBy',
+                        select: 'username email',
+                        model: 'User'
+                    }
+                })
+                .populate('assignedTo', 'username email department')
+                .populate('submittedBy', 'username email')
+                .populate('completedBy', 'username email')
+                .sort({ dueDate: -1 })
+                .lean();
+        } catch (populateError) {
+            console.error('Error populating checklist data:', populateError);
+            // Try without nested populate if it fails
+            checklists = await ChecklistOccurrence.find({})
+                .populate('templateId', 'name category frequency')
+                .populate('assignedTo', 'username email department')
+                .populate('submittedBy', 'username email')
+                .populate('completedBy', 'username email')
+                .sort({ dueDate: -1 })
+                .lean();
+        }
 
-        // Transform data for frontend
+        // Transform data for frontend with defensive coding
         const transformedChecklists = checklists.map(checklist => {
-            const template = checklist.templateId;
-            // Get assignedBy from template's createdBy or use submittedBy as fallback
-            const assignedBy = (template?.createdBy && typeof template.createdBy === 'object') 
-                ? template.createdBy 
-                : (checklist.submittedBy || null);
-            
-            return {
-                _id: checklist._id,
-                templateName: checklist.templateName || (template?.name || 'Unknown'),
-                category: checklist.category || (template?.category || 'General'),
-                frequency: template?.frequency || 'N/A',
-                assignedTo: checklist.assignedTo ? {
-                    _id: checklist.assignedTo._id,
-                    username: checklist.assignedTo.username || 'Unknown',
-                    email: checklist.assignedTo.email || '',
-                    department: checklist.assignedTo.department || 'General'
-                } : null,
-                assignedBy: assignedBy ? {
-                    _id: assignedBy._id || assignedBy,
-                    username: assignedBy.username || 'Unknown',
-                    email: assignedBy.email || ''
-                } : null,
-                dueDate: checklist.dueDate,
-                status: checklist.status,
-                progressPercentage: checklist.progressPercentage || 0,
-                completedAt: checklist.completedAt,
-                completedBy: checklist.completedBy ? {
-                    _id: checklist.completedBy._id,
-                    username: checklist.completedBy.username || 'Unknown'
-                } : null,
-                createdAt: checklist.createdAt,
-                updatedAt: checklist.updatedAt,
-                itemsCount: checklist.items ? checklist.items.length : 0,
-                completedItemsCount: checklist.items ? checklist.items.filter((item) => item.status === 'done' || item.checked).length : 0
-            };
+            try {
+                const template = checklist.templateId;
+                
+                // Safely extract template data
+                const templateName = checklist.templateName || (template?.name || 'Unknown');
+                const category = checklist.category || (template?.category || 'General');
+                const frequency = template?.frequency || 'N/A';
+                
+                // Get assignedBy - try template's createdBy first, then submittedBy
+                let assignedBy = null;
+                if (template?.createdBy) {
+                    if (typeof template.createdBy === 'object' && template.createdBy !== null) {
+                        assignedBy = {
+                            _id: template.createdBy._id?.toString() || template.createdBy.toString(),
+                            username: template.createdBy.username || 'Unknown',
+                            email: template.createdBy.email || ''
+                        };
+                    }
+                }
+                if (!assignedBy && checklist.submittedBy) {
+                    if (typeof checklist.submittedBy === 'object' && checklist.submittedBy !== null) {
+                        assignedBy = {
+                            _id: checklist.submittedBy._id?.toString() || checklist.submittedBy.toString(),
+                            username: checklist.submittedBy.username || 'Unknown',
+                            email: checklist.submittedBy.email || ''
+                        };
+                    }
+                }
+                
+                // Safely extract assignedTo
+                let assignedTo = null;
+                if (checklist.assignedTo) {
+                    if (typeof checklist.assignedTo === 'object' && checklist.assignedTo !== null) {
+                        assignedTo = {
+                            _id: checklist.assignedTo._id?.toString() || checklist.assignedTo.toString(),
+                            username: checklist.assignedTo.username || 'Unknown',
+                            email: checklist.assignedTo.email || '',
+                            department: checklist.assignedTo.department || 'General'
+                        };
+                    }
+                }
+                
+                // Safely extract completedBy
+                let completedBy = null;
+                if (checklist.completedBy) {
+                    if (typeof checklist.completedBy === 'object' && checklist.completedBy !== null) {
+                        completedBy = {
+                            _id: checklist.completedBy._id?.toString() || checklist.completedBy.toString(),
+                            username: checklist.completedBy.username || 'Unknown'
+                        };
+                    }
+                }
+                
+                // Safely count items
+                const items = Array.isArray(checklist.items) ? checklist.items : [];
+                const itemsCount = items.length;
+                const completedItemsCount = items.filter((item) => {
+                    if (!item) return false;
+                    return item.status === 'done' || (item.checked === true);
+                }).length;
+                
+                return {
+                    _id: checklist._id?.toString() || String(checklist._id),
+                    templateName,
+                    category,
+                    frequency,
+                    assignedTo,
+                    assignedBy,
+                    dueDate: checklist.dueDate,
+                    status: checklist.status || 'pending',
+                    progressPercentage: checklist.progressPercentage || 0,
+                    completedAt: checklist.completedAt || null,
+                    completedBy,
+                    createdAt: checklist.createdAt,
+                    updatedAt: checklist.updatedAt,
+                    itemsCount,
+                    completedItemsCount
+                };
+            } catch (transformError) {
+                console.error('Error transforming checklist:', transformError, checklist);
+                // Return a safe default object
+                return {
+                    _id: checklist._id?.toString() || 'unknown',
+                    templateName: 'Error loading',
+                    category: 'General',
+                    frequency: 'N/A',
+                    assignedTo: null,
+                    assignedBy: null,
+                    dueDate: checklist.dueDate || new Date(),
+                    status: 'pending',
+                    progressPercentage: 0,
+                    completedAt: null,
+                    completedBy: null,
+                    createdAt: checklist.createdAt || new Date(),
+                    updatedAt: checklist.updatedAt || new Date(),
+                    itemsCount: 0,
+                    completedItemsCount: 0
+                };
+            }
         });
 
         res.json(transformedChecklists);
     } catch (error) {
         console.error('Error fetching checklist master data:', error);
+        console.error('Error stack:', error.stack);
         res.status(500).json({ 
             message: 'Server error', 
             error: error.message,
