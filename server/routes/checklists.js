@@ -723,41 +723,63 @@ router.get('/person-wise-assignments', auth, async (req, res) => {
             return res.status(403).json({ message: 'Only Super Admins can access this report' });
         }
 
-        // Get all checklist templates with their assignments (without lean for better populate support)
-        const templates = await ChecklistTemplate.find({ status: 'active' })
-            .populate('assignedTo', 'username email department');
+        // Get all checklist templates with their assignments
+        // Use lean() and handle populate separately for better error handling
+        let templates = [];
+        let occurrences = [];
+        
+        try {
+            templates = await ChecklistTemplate.find({ status: 'active' })
+                .populate('assignedTo', 'username email department')
+                .lean();
+        } catch (templateError) {
+            console.error('Error fetching templates:', templateError);
+            throw new Error(`Failed to fetch templates: ${templateError.message}`);
+        }
 
         // Get all checklist occurrences to count actual assignments
-        const occurrences = await ChecklistOccurrence.find({})
-            .populate('templateId', 'name frequency');
+        try {
+            occurrences = await ChecklistOccurrence.find({})
+                .populate('templateId', 'name frequency')
+                .lean();
+        } catch (occurrenceError) {
+            console.error('Error fetching occurrences:', occurrenceError);
+            // Continue even if occurrences fail - we can still show templates
+            occurrences = [];
+        }
 
         // Group by person
         const personWiseData = {};
 
         for (const template of templates) {
             try {
-                // Handle assignedTo - could be populated object or ObjectId
+                // Handle assignedTo - could be populated object, ObjectId, or null
                 const assignedTo = template.assignedTo;
                 
-                // Skip if assignedTo is null or undefined
-                if (!assignedTo) {
+                // Skip if assignedTo is null, undefined, or not an object
+                if (!assignedTo || typeof assignedTo !== 'object') {
                     continue;
                 }
                 
-                // Get user ID - handle both populated and non-populated
+                // Get user ID - handle Mongoose ObjectId
                 let userId;
-                if (assignedTo._id) {
-                    userId = assignedTo._id.toString();
-                } else if (typeof assignedTo === 'object' && assignedTo.toString) {
-                    userId = assignedTo.toString();
-                } else if (typeof assignedTo === 'string') {
-                    // Unpopulated ObjectId string - skip this template
-                    continue;
-                } else {
+                try {
+                    if (assignedTo._id) {
+                        userId = String(assignedTo._id);
+                    } else {
+                        // Try to get ID from the object itself
+                        userId = String(assignedTo);
+                    }
+                } catch (idError) {
+                    console.warn(`Could not extract userId from template ${template._id}:`, idError.message);
                     continue;
                 }
                 
-                // Get user details
+                if (!userId || userId === 'null' || userId === 'undefined') {
+                    continue;
+                }
+                
+                // Get user details with safe access
                 const username = assignedTo.username || 'Unknown';
                 const email = assignedTo.email || '';
                 const department = assignedTo.department || 'General';
@@ -774,7 +796,7 @@ router.get('/person-wise-assignments', auth, async (req, res) => {
                 }
 
                 // Get template ID
-                const templateId = template._id ? template._id.toString() : null;
+                const templateId = template._id ? String(template._id) : null;
                 if (!templateId) {
                     continue;
                 }
@@ -782,21 +804,24 @@ router.get('/person-wise-assignments', auth, async (req, res) => {
                 // Count occurrences for this template
                 let occurrenceCount = 0;
                 for (const occ of occurrences) {
-                    if (!occ.templateId) continue;
+                    if (!occ || !occ.templateId) continue;
                     
-                    let occTemplateId;
-                    if (occ.templateId._id) {
-                        occTemplateId = occ.templateId._id.toString();
-                    } else if (typeof occ.templateId === 'object' && occ.templateId.toString) {
-                        occTemplateId = occ.templateId.toString();
-                    } else if (typeof occ.templateId === 'string') {
-                        occTemplateId = occ.templateId;
-                    } else {
+                    try {
+                        let occTemplateId;
+                        if (occ.templateId._id) {
+                            occTemplateId = String(occ.templateId._id);
+                        } else if (typeof occ.templateId === 'object') {
+                            occTemplateId = String(occ.templateId);
+                        } else {
+                            occTemplateId = String(occ.templateId);
+                        }
+                        
+                        if (occTemplateId === templateId) {
+                            occurrenceCount++;
+                        }
+                    } catch (occError) {
+                        // Skip this occurrence if there's an error
                         continue;
-                    }
-                    
-                    if (occTemplateId === templateId) {
-                        occurrenceCount++;
                     }
                 }
 
@@ -819,14 +844,23 @@ router.get('/person-wise-assignments', auth, async (req, res) => {
         const result = Object.values(personWiseData)
             .map(person => ({
                 ...person,
-                checklists: person.checklists.sort((a, b) => a.templateName.localeCompare(b.templateName)),
+                checklists: person.checklists.sort((a, b) => {
+                    const nameA = a.templateName || '';
+                    const nameB = b.templateName || '';
+                    return nameA.localeCompare(nameB);
+                }),
                 totalChecklists: person.checklists.length
             }))
-            .sort((a, b) => a.username.localeCompare(b.username));
+            .sort((a, b) => {
+                const nameA = a.username || '';
+                const nameB = b.username || '';
+                return nameA.localeCompare(nameB);
+            });
 
         res.json(result);
     } catch (error) {
         console.error('Error fetching person-wise assignments:', error);
+        console.error('Error message:', error.message);
         console.error('Error stack:', error.stack);
         res.status(500).json({ 
             message: 'Server error', 

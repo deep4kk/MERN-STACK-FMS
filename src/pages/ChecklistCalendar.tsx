@@ -295,9 +295,10 @@ const ChecklistCalendar: React.FC = () => {
         if (!personWiseData) return;
 
         try {
-            const reportElement = document.getElementById('person-wise-report');
+            // Find the table content element
+            const reportElement = document.getElementById('person-wise-report-table');
             if (!reportElement) {
-                alert('Report element not found');
+                alert('Report content not found');
                 return;
             }
 
@@ -1435,271 +1436,216 @@ const ChecklistCalendar: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Modal Content - Print View */}
+                        {/* Modal Content - Table View */}
                         <div className="p-6 overflow-y-auto flex-1">
                             {loadingPersonWise ? (
                                 <div className="flex justify-center items-center py-12">
                                     <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: 'var(--color-primary)' }}></div>
                                 </div>
-                            ) : personWiseData ? (
-                            <div id="person-wise-report" className="print-view">
-                                {/* Print Styles */}
-                                <style>{`
-                                    @media print {
-                                        body * {
-                                            visibility: hidden;
-                                        }
-                                        #person-wise-report, #person-wise-report * {
-                                            visibility: visible;
-                                        }
-                                        #person-wise-report {
-                                            position: absolute;
-                                            left: 0;
-                                            top: 0;
-                                            width: 100%;
-                                            padding: 10px;
-                                            background: white;
-                                        }
-                                        .no-print {
-                                            display: none !important;
-                                        }
-                                        .page-break {
-                                            page-break-before: always;
-                                        }
-                                        .person-section {
-                                            page-break-inside: avoid;
-                                            margin-bottom: 12px;
-                                        }
-                                        table {
-                                            font-size: 10px;
-                                            width: 100%;
-                                        }
-                                        th, td {
-                                            padding: 4px 6px !important;
-                                        }
-                                        h1 {
-                                            font-size: 20px !important;
-                                            margin-bottom: 8px !important;
-                                        }
-                                        h2 {
-                                            font-size: 16px !important;
-                                            margin-bottom: 6px !important;
-                                        }
-                                        h3 {
-                                            font-size: 14px !important;
-                                            margin-bottom: 4px !important;
-                                        }
-                                        .person-section > div:first-child {
-                                            padding: 8px !important;
-                                            margin-bottom: 6px !important;
-                                        }
-                                        .summary-section {
-                                            padding: 10px !important;
-                                            margin-bottom: 10px !important;
-                                        }
-                                    }
-                                    @page {
-                                        size: A4;
-                                        margin: 1cm;
-                                    }
-                                `}</style>
-
-                                {/* Report Header */}
-                                <div className="mb-4 text-center border-b pb-3" style={{ borderColor: 'var(--color-border)' }}>
-                                    <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--color-text)' }}>
-                                        Checklist Assignment Report
-                                    </h1>
-                                    <p className="text-base font-semibold" style={{ color: 'var(--color-primary)' }}>
-                                        All-Time Overview
-                                    </p>
-                                    <p className="text-xs mt-1" style={{ color: 'var(--color-textSecondary)' }}>
-                                        Generated on {new Date().toLocaleDateString('en-US', { 
-                                            year: 'numeric', 
-                                            month: 'long', 
-                                            day: 'numeric',
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                        })}
-                                    </p>
-                                </div>
-
-                                {/* Summary Section */}
-                                <div className="mb-4 p-4 rounded-lg border" style={{ 
-                                    backgroundColor: 'var(--color-background)',
-                                    borderColor: 'var(--color-border)'
-                                }}>
-                                    <h2 className="text-lg font-bold mb-3" style={{ color: 'var(--color-text)' }}>
-                                        Summary Overview
-                                    </h2>
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div className="text-center p-3 rounded" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)' }}>
-                                            <p className="text-2xl font-bold" style={{ color: '#3b82f6' }}>
-                                                {personWiseData.summary.totalPersons}
-                                            </p>
-                                            <p className="text-xs font-medium mt-1" style={{ color: 'var(--color-textSecondary)' }}>People Assigned</p>
+                            ) : personWiseData && personWiseData.data ? (
+                            <div id="person-wise-report-table">
+                                {/* Summary Cards */}
+                                <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="p-4 rounded-lg border-l-4 shadow-sm" style={{ 
+                                        backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                                        borderLeftColor: '#3b82f6'
+                                    }}>
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-sm font-medium mb-1" style={{ color: 'var(--color-textSecondary)' }}>
+                                                    People Assigned
+                                                </p>
+                                                <p className="text-3xl font-bold" style={{ color: '#3b82f6' }}>
+                                                    {personWiseData.summary.totalPersons}
+                                                </p>
+                                            </div>
+                                            <Users className="w-10 h-10 opacity-20" style={{ color: '#3b82f6' }} />
                                         </div>
-                                        <div className="text-center p-3 rounded" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)' }}>
-                                            <p className="text-2xl font-bold" style={{ color: '#10b981' }}>
-                                                {personWiseData.summary.totalChecklists}
-                                            </p>
-                                            <p className="text-xs font-medium mt-1" style={{ color: 'var(--color-textSecondary)' }}>Active Checklists</p>
+                                    </div>
+                                    <div className="p-4 rounded-lg border-l-4 shadow-sm" style={{ 
+                                        backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                                        borderLeftColor: '#10b981'
+                                    }}>
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-sm font-medium mb-1" style={{ color: 'var(--color-textSecondary)' }}>
+                                                    Active Checklists
+                                                </p>
+                                                <p className="text-3xl font-bold" style={{ color: '#10b981' }}>
+                                                    {personWiseData.summary.totalChecklists}
+                                                </p>
+                                            </div>
+                                            <ListTodo className="w-10 h-10 opacity-20" style={{ color: '#10b981' }} />
                                         </div>
-                                        <div className="text-center p-3 rounded" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)' }}>
-                                            <p className="text-2xl font-bold" style={{ color: '#f59e0b' }}>
-                                                {personWiseData.summary.totalOccurrences}
-                                            </p>
-                                            <p className="text-xs font-medium mt-1" style={{ color: 'var(--color-textSecondary)' }}>Total Occurrences</p>
+                                    </div>
+                                    <div className="p-4 rounded-lg border-l-4 shadow-sm" style={{ 
+                                        backgroundColor: 'rgba(245, 158, 11, 0.05)',
+                                        borderLeftColor: '#f59e0b'
+                                    }}>
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-sm font-medium mb-1" style={{ color: 'var(--color-textSecondary)' }}>
+                                                    Total Occurrences
+                                                </p>
+                                                <p className="text-3xl font-bold" style={{ color: '#f59e0b' }}>
+                                                    {personWiseData.summary.totalOccurrences}
+                                                </p>
+                                            </div>
+                                            <CalendarDays className="w-10 h-10 opacity-20" style={{ color: '#f59e0b' }} />
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Person-Wise Details */}
-                                <div className="space-y-3">
-                                    {personWiseData.data.map((person: any, personIndex: number) => {
-                                        // Add page break roughly in the middle to fit 2 pages
-                                        const shouldBreak = personIndex > 0 && personIndex === Math.ceil(personWiseData.data.length / 2);
-                                        
-                                        // Sort checklists by frequency priority
-                                        const frequencyOrder: Record<string, number> = {
-                                            'daily': 1,
-                                            'weekly': 2,
-                                            'fortnightly': 3,
-                                            'monthly': 4,
-                                            'quarterly': 5,
-                                            'yearly': 6
-                                        };
-                                        
-                                        const sortedChecklists = [...person.checklists].sort((a: any, b: any) => {
-                                            const aOrder = frequencyOrder[a.frequency] || 99;
-                                            const bOrder = frequencyOrder[b.frequency] || 99;
-                                            if (aOrder !== bOrder) return aOrder - bOrder;
-                                            return a.templateName.localeCompare(b.templateName);
-                                        });
-                                        
-                                        return (
-                                            <div 
-                                                key={person.userId} 
-                                                className={`person-section ${shouldBreak ? 'page-break' : ''}`}
-                                            >
-                                                {/* Person Header */}
-                                                <div className="mb-2 p-3 rounded-lg border-l-4 shadow-sm" style={{ 
-                                                    backgroundColor: 'var(--color-background)',
-                                                    borderLeftColor: 'var(--color-primary)'
-                                                }}>
-                                                    <div className="flex justify-between items-start">
-                                                        <div>
-                                                            <h3 className="text-base font-bold mb-0.5" style={{ color: 'var(--color-text)' }}>
-                                                                {person.username}
-                                                            </h3>
-                                                            <p className="text-xs" style={{ color: 'var(--color-textSecondary)' }}>
-                                                                {person.email} {person.department && `• ${person.department}`}
-                                                            </p>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <p className="text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>
-                                                                {person.totalChecklists} Checklist{person.totalChecklists !== 1 ? 's' : ''}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Checklists Table */}
-                                                <div className="overflow-x-auto">
-                                                    <table className="w-full border-collapse" style={{ borderColor: 'var(--color-border)' }}>
-                                                        <thead>
-                                                            <tr style={{ backgroundColor: 'var(--color-background)' }}>
-                                                                <th className="p-2 text-left border-b font-semibold text-xs" style={{ 
-                                                                    borderColor: 'var(--color-border)',
-                                                                    color: 'var(--color-text)'
-                                                                }}>
-                                                                    Checklist Name
-                                                                </th>
-                                                                <th className="p-2 text-center border-b font-semibold text-xs" style={{ 
-                                                                    borderColor: 'var(--color-border)',
-                                                                    color: 'var(--color-text)'
-                                                                }}>
-                                                                    Frequency
-                                                                </th>
-                                                                <th className="p-2 text-center border-b font-semibold text-xs" style={{ 
-                                                                    borderColor: 'var(--color-border)',
-                                                                    color: 'var(--color-text)'
-                                                                }}>
-                                                                    Category
-                                                                </th>
-                                                                <th className="p-2 text-center border-b font-semibold text-xs" style={{ 
-                                                                    borderColor: 'var(--color-border)',
-                                                                    color: 'var(--color-text)'
-                                                                }}>
-                                                                    Occurrences
-                                                                </th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {sortedChecklists.map((checklist: any, idx: number) => (
-                                                                <tr 
-                                                                    key={checklist.templateId}
+                                {/* Main Table */}
+                                <div className="rounded-lg border overflow-hidden" style={{ 
+                                    borderColor: 'var(--color-border)',
+                                    backgroundColor: 'var(--color-surface)'
+                                }}>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full">
+                                            <thead>
+                                                <tr style={{ backgroundColor: 'var(--color-background)' }}>
+                                                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style={{ 
+                                                        color: 'var(--color-text)',
+                                                        borderBottom: '2px solid var(--color-border)'
+                                                    }}>
+                                                        Person
+                                                    </th>
+                                                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider" style={{ 
+                                                        color: 'var(--color-text)',
+                                                        borderBottom: '2px solid var(--color-border)'
+                                                    }}>
+                                                        Checklist Name
+                                                    </th>
+                                                    <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider" style={{ 
+                                                        color: 'var(--color-text)',
+                                                        borderBottom: '2px solid var(--color-border)'
+                                                    }}>
+                                                        Frequency
+                                                    </th>
+                                                    <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider" style={{ 
+                                                        color: 'var(--color-text)',
+                                                        borderBottom: '2px solid var(--color-border)'
+                                                    }}>
+                                                        Category
+                                                    </th>
+                                                    <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider" style={{ 
+                                                        color: 'var(--color-text)',
+                                                        borderBottom: '2px solid var(--color-border)'
+                                                    }}>
+                                                        Occurrences
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
+                                                {personWiseData.data.map((person: any, personIndex: number) => {
+                                                    // Sort checklists by frequency priority
+                                                    const frequencyOrder: Record<string, number> = {
+                                                        'daily': 1,
+                                                        'weekly': 2,
+                                                        'fortnightly': 3,
+                                                        'monthly': 4,
+                                                        'quarterly': 5,
+                                                        'yearly': 6
+                                                    };
+                                                    
+                                                    const sortedChecklists = [...person.checklists].sort((a: any, b: any) => {
+                                                        const aOrder = frequencyOrder[a.frequency] || 99;
+                                                        const bOrder = frequencyOrder[b.frequency] || 99;
+                                                        if (aOrder !== bOrder) return aOrder - bOrder;
+                                                        return a.templateName.localeCompare(b.templateName);
+                                                    });
+                                                    
+                                                    return sortedChecklists.map((checklist: any, checklistIndex: number) => (
+                                                        <tr 
+                                                            key={`${person.userId}-${checklist.templateId}`}
+                                                            className="hover:opacity-80 transition-opacity"
+                                                            style={{ 
+                                                                backgroundColor: personIndex % 2 === 0 ? 'var(--color-surface)' : 'var(--color-background)'
+                                                            }}
+                                                        >
+                                                            {checklistIndex === 0 && (
+                                                                <td 
+                                                                    className="px-6 py-4 whitespace-nowrap align-top" 
+                                                                    rowSpan={sortedChecklists.length}
                                                                     style={{ 
-                                                                        backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(0, 0, 0, 0.02)'
+                                                                        borderRight: '2px solid var(--color-border)',
+                                                                        color: 'var(--color-text)'
                                                                     }}
                                                                 >
-                                                                    <td className="p-2 border-b text-xs" style={{ 
-                                                                        borderColor: 'var(--color-border)',
-                                                                        color: 'var(--color-text)'
-                                                                    }}>
-                                                                        <div className="font-medium">{checklist.templateName}</div>
-                                                                    </td>
-                                                                    <td className="p-2 border-b text-center text-xs" style={{ 
-                                                                        borderColor: 'var(--color-border)',
-                                                                        color: 'var(--color-text)'
-                                                                    }}>
-                                                                        <span className="px-2 py-1 rounded text-xs font-medium capitalize inline-block" style={{ 
-                                                                            backgroundColor: checklist.frequency === 'daily' ? 'rgba(59, 130, 246, 0.15)' :
-                                                                                            checklist.frequency === 'weekly' ? 'rgba(16, 185, 129, 0.15)' :
-                                                                                            checklist.frequency === 'fortnightly' ? 'rgba(139, 92, 246, 0.15)' :
-                                                                                            checklist.frequency === 'monthly' ? 'rgba(245, 158, 11, 0.15)' :
-                                                                                            checklist.frequency === 'quarterly' ? 'rgba(236, 72, 153, 0.15)' :
-                                                                                            checklist.frequency === 'yearly' ? 'rgba(239, 68, 68, 0.15)' :
-                                                                                            'rgba(156, 163, 175, 0.15)',
-                                                                            color: checklist.frequency === 'daily' ? '#3b82f6' :
-                                                                                   checklist.frequency === 'weekly' ? '#10b981' :
-                                                                                   checklist.frequency === 'fortnightly' ? '#8b5cf6' :
-                                                                                   checklist.frequency === 'monthly' ? '#f59e0b' :
-                                                                                   checklist.frequency === 'quarterly' ? '#ec4899' :
-                                                                                   checklist.frequency === 'yearly' ? '#ef4444' :
-                                                                                   '#9ca3af'
-                                                                        }}>
-                                                                            {checklist.frequency}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className="p-2 border-b text-center text-xs" style={{ 
-                                                                        borderColor: 'var(--color-border)',
-                                                                        color: 'var(--color-textSecondary)'
-                                                                    }}>
-                                                                        {checklist.category || 'General'}
-                                                                    </td>
-                                                                    <td className="p-2 border-b text-center text-xs font-semibold" style={{ 
-                                                                        borderColor: 'var(--color-border)',
-                                                                        color: 'var(--color-primary)'
-                                                                    }}>
-                                                                        {checklist.occurrenceCount || 0}
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                                                                    <div className="font-semibold text-sm mb-1">{person.username}</div>
+                                                                    <div className="text-xs" style={{ color: 'var(--color-textSecondary)' }}>
+                                                                        {person.email}
+                                                                    </div>
+                                                                    {person.department && (
+                                                                        <div className="text-xs mt-1" style={{ color: 'var(--color-textSecondary)' }}>
+                                                                            {person.department}
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="mt-2 text-xs font-medium" style={{ color: 'var(--color-primary)' }}>
+                                                                        {person.totalChecklists} checklist{person.totalChecklists !== 1 ? 's' : ''}
+                                                                    </div>
+                                                                </td>
+                                                            )}
+                                                            <td className="px-6 py-4 text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+                                                                {checklist.templateName}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-center">
+                                                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium" style={{ 
+                                                                    backgroundColor: checklist.frequency === 'daily' ? 'rgba(59, 130, 246, 0.15)' :
+                                                                                    checklist.frequency === 'weekly' ? 'rgba(16, 185, 129, 0.15)' :
+                                                                                    checklist.frequency === 'fortnightly' ? 'rgba(139, 92, 246, 0.15)' :
+                                                                                    checklist.frequency === 'monthly' ? 'rgba(245, 158, 11, 0.15)' :
+                                                                                    checklist.frequency === 'quarterly' ? 'rgba(236, 72, 153, 0.15)' :
+                                                                                    checklist.frequency === 'yearly' ? 'rgba(239, 68, 68, 0.15)' :
+                                                                                    'rgba(156, 163, 175, 0.15)',
+                                                                    color: checklist.frequency === 'daily' ? '#3b82f6' :
+                                                                           checklist.frequency === 'weekly' ? '#10b981' :
+                                                                           checklist.frequency === 'fortnightly' ? '#8b5cf6' :
+                                                                           checklist.frequency === 'monthly' ? '#f59e0b' :
+                                                                           checklist.frequency === 'quarterly' ? '#ec4899' :
+                                                                           checklist.frequency === 'yearly' ? '#ef4444' :
+                                                                           '#9ca3af'
+                                                                }}>
+                                                                    {checklist.frequency.charAt(0).toUpperCase() + checklist.frequency.slice(1)}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-center text-sm" style={{ color: 'var(--color-textSecondary)' }}>
+                                                                {checklist.category || 'General'}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-center">
+                                                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold" style={{ 
+                                                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                                                    color: '#3b82f6'
+                                                                }}>
+                                                                    {checklist.occurrenceCount || 0}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ));
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
 
-                                {/* Footer */}
-                                <div className="mt-4 pt-3 border-t text-center text-xs" style={{ 
-                                    borderColor: 'var(--color-border)',
-                                    color: 'var(--color-textSecondary)'
+                                {/* Info Footer */}
+                                <div className="mt-4 p-4 rounded-lg" style={{ 
+                                    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                                    border: '1px solid rgba(59, 130, 246, 0.2)'
                                 }}>
-                                    <p className="mb-1 font-medium">This report shows all active checklists assigned to each person (all-time data).</p>
-                                    <p>Checklists are sorted by frequency (Daily → Weekly → Fortnightly → Monthly → Quarterly → Yearly) and then alphabetically.</p>
+                                    <div className="flex items-start gap-3">
+                                        <Info className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: '#3b82f6' }} />
+                                        <div className="text-sm" style={{ color: 'var(--color-textSecondary)' }}>
+                                            <p className="font-medium mb-1" style={{ color: 'var(--color-text)' }}>
+                                                All-Time Checklist Assignment Report
+                                            </p>
+                                            <p>
+                                                This table shows all active checklists assigned to each person. Checklists are sorted by frequency 
+                                                (Daily → Weekly → Fortnightly → Monthly → Quarterly → Yearly) and then alphabetically.
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             ) : (
@@ -1712,11 +1658,11 @@ const ChecklistCalendar: React.FC = () => {
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="p-6 border-t flex justify-between items-center gap-3 no-print" style={{ borderColor: 'var(--color-border)' }}>
+                        <div className="p-6 border-t flex justify-between items-center gap-3" style={{ borderColor: 'var(--color-border)' }}>
                             <div className="flex gap-2">
                                 <button
                                     onClick={handleExportToExcel}
-                                    className="px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-all hover:shadow-md border"
+                                    className="px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all hover:shadow-md border"
                                     style={{ 
                                         borderColor: 'var(--color-border)',
                                         color: 'var(--color-text)',
@@ -1728,7 +1674,7 @@ const ChecklistCalendar: React.FC = () => {
                                 </button>
                                 <button
                                     onClick={handleExportToPDF}
-                                    className="px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-all hover:shadow-md border"
+                                    className="px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all hover:shadow-md border"
                                     style={{ 
                                         borderColor: 'var(--color-border)',
                                         color: 'var(--color-text)',
@@ -1739,30 +1685,17 @@ const ChecklistCalendar: React.FC = () => {
                                     Export PDF
                                 </button>
                             </div>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={handlePrintReport}
-                                    className="px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-all hover:shadow-md"
-                                    style={{ 
-                                        backgroundColor: 'var(--color-primary)', 
-                                        color: 'white' 
-                                    }}
-                                >
-                                    <Printer className="w-4 h-4" />
-                                    Print Report
-                                </button>
-                                <button
-                                    onClick={() => setShowPersonWiseReport(false)}
-                                    className="px-4 py-2 rounded-lg border transition-colors"
-                                    style={{ 
-                                        borderColor: 'var(--color-border)',
-                                        color: 'var(--color-text)',
-                                        backgroundColor: 'var(--color-background)'
-                                    }}
-                                >
-                                    Close
-                                </button>
-                            </div>
+                            <button
+                                onClick={() => setShowPersonWiseReport(false)}
+                                className="px-4 py-2 rounded-lg border transition-colors"
+                                style={{ 
+                                    borderColor: 'var(--color-border)',
+                                    color: 'var(--color-text)',
+                                    backgroundColor: 'var(--color-background)'
+                                }}
+                            >
+                                Close
+                            </button>
                         </div>
                     </div>
                 </div>
