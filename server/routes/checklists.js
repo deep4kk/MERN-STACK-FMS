@@ -738,36 +738,80 @@ router.get('/person-wise-assignments', auth, async (req, res) => {
         const personWiseData = {};
 
         templates.forEach(template => {
-            if (!template.assignedTo) return;
-            
-            const userId = template.assignedTo._id.toString();
-            const username = template.assignedTo.username || 'Unknown';
-            const email = template.assignedTo.email || '';
-            const department = template.assignedTo.department || 'General';
+            try {
+                // Handle both populated and non-populated assignedTo
+                const assignedTo = template.assignedTo;
+                
+                // Skip if assignedTo is null, undefined, or a string (unpopulated ObjectId)
+                if (!assignedTo) {
+                    return;
+                }
+                
+                if (typeof assignedTo === 'string') {
+                    return;
+                }
 
-            if (!personWiseData[userId]) {
-                personWiseData[userId] = {
-                    userId,
-                    username,
-                    email,
-                    department,
-                    checklists: []
-                };
+                // When using .lean(), _id is a plain object, not a Mongoose document
+                // Handle both ObjectId and populated object
+                const userId = assignedTo._id 
+                    ? (typeof assignedTo._id === 'object' ? assignedTo._id.toString() : assignedTo._id)
+                    : (assignedTo.toString ? assignedTo.toString() : null);
+                
+                if (!userId) {
+                    return;
+                }
+                
+                const username = assignedTo.username || 'Unknown';
+                const email = assignedTo.email || '';
+                const department = assignedTo.department || 'General';
+
+                if (!personWiseData[userId]) {
+                    personWiseData[userId] = {
+                        userId,
+                        username,
+                        email,
+                        department,
+                        checklists: []
+                    };
+                }
+
+                // Count occurrences for this template
+                if (!template._id) {
+                    return; // Skip if template has no _id
+                }
+                const templateIdStr = typeof template._id === 'object' 
+                    ? template._id.toString() 
+                    : String(template._id);
+                const occurrenceCount = occurrences.filter(occ => {
+                    if (!occ.templateId) return false;
+                    try {
+                        // Handle both populated and non-populated templateId
+                        let occTemplateId;
+                        if (occ.templateId._id) {
+                            occTemplateId = typeof occ.templateId._id === 'object' 
+                                ? occ.templateId._id.toString() 
+                                : String(occ.templateId._id);
+                        } else {
+                            occTemplateId = occ.templateId.toString ? occ.templateId.toString() : String(occ.templateId);
+                        }
+                        return occTemplateId === templateIdStr;
+                    } catch (err) {
+                        return false;
+                    }
+                }).length;
+
+                personWiseData[userId].checklists.push({
+                    templateId: templateIdStr,
+                    templateName: template.name || 'Unnamed Checklist',
+                    frequency: template.frequency || 'monthly',
+                    category: template.category || 'General',
+                    occurrenceCount,
+                    status: template.status || 'active'
+                });
+            } catch (err) {
+                console.warn(`Error processing template ${template._id}:`, err.message);
+                // Continue with next template
             }
-
-            // Count occurrences for this template
-            const occurrenceCount = occurrences.filter(occ => 
-                occ.templateId && occ.templateId._id.toString() === template._id.toString()
-            ).length;
-
-            personWiseData[userId].checklists.push({
-                templateId: template._id.toString(),
-                templateName: template.name,
-                frequency: template.frequency || 'monthly',
-                category: template.category || 'General',
-                occurrenceCount,
-                status: template.status
-            });
         });
 
         // Convert to array and sort by username
@@ -782,7 +826,12 @@ router.get('/person-wise-assignments', auth, async (req, res) => {
         res.json(result);
     } catch (error) {
         console.error('Error fetching person-wise assignments:', error);
-        res.status(500).json({ message: 'Server error', error: error.message });
+        console.error('Error stack:', error.stack);
+        res.status(500).json({ 
+            message: 'Server error', 
+            error: error.message,
+            stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+        });
     }
 });
 
