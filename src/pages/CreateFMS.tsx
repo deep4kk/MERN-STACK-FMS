@@ -146,28 +146,63 @@ const CreateFMS: React.FC = () => {
         yearlyDuration: 3
       });
       
-      // Populate steps
+      // Populate steps - preserve ALL existing values
       if (fmsData.steps && fmsData.steps.length > 0) {
-        const loadedSteps = fmsData.steps.map((step: any, index: number) => ({
-          stepNo: index + 1,
-          what: step.what || '',
-          who: step.who ? (Array.isArray(step.who) ? (step.who[0] ? (typeof step.who[0] === 'string' ? step.who[0] : step.who[0]._id || step.who[0].id) : '') : (typeof step.who === 'string' ? step.who : step.who._id || step.who.id)) : '',
-          how: step.how || '',
-          when: step.when || 1,
-          whenUnit: step.whenUnit || 'days',
-          whenDays: step.whenDays,
-          whenHours: step.whenHours,
-          whenType: step.whenType || 'fixed',
-          dependentOnStep: step.dependentOnStep,
-          dependentDelay: step.dependentDelay,
-          dependentDelayUnit: step.dependentDelayUnit,
-          requiresChecklist: step.requiresChecklist || false,
-          checklistItems: step.checklistItems || [],
-          attachments: [], // Existing attachments are kept on server
-          triggersFMSId: step.triggersFMSId,
-          requireAttachments: step.requireAttachments || false,
-          mandatoryAttachments: step.mandatoryAttachments || false
-        }));
+        const loadedSteps = fmsData.steps.map((step: any, index: number) => {
+          // Extract who (assignee) - handle both populated and non-populated cases
+          let whoValue = '';
+          if (step.who) {
+            if (Array.isArray(step.who)) {
+              whoValue = step.who[0] ? (typeof step.who[0] === 'string' ? step.who[0] : step.who[0]._id || step.who[0].id || '') : '';
+            } else {
+              whoValue = typeof step.who === 'string' ? step.who : (step.who._id || step.who.id || '');
+            }
+          }
+
+          // Preserve all when-related values
+          const whenValue = step.when !== undefined && step.when !== null ? step.when : (index === 0 ? 1 : 0);
+          const whenDaysValue = step.whenDays !== undefined && step.whenDays !== null ? step.whenDays : 0;
+          const whenHoursValue = step.whenHours !== undefined && step.whenHours !== null ? step.whenHours : 0;
+          const whenUnitValue = step.whenUnit || 'days';
+          const whenTypeValue = step.whenType || (index === 0 ? 'fixed' : 'dependent');
+
+          // Preserve triggersFMSId - handle both ObjectId and string
+          let triggersFMSIdValue = undefined;
+          if (step.triggersFMSId) {
+            if (typeof step.triggersFMSId === 'string') {
+              triggersFMSIdValue = step.triggersFMSId;
+            } else if (step.triggersFMSId._id) {
+              triggersFMSIdValue = step.triggersFMSId._id.toString();
+            } else if (step.triggersFMSId.toString) {
+              triggersFMSIdValue = step.triggersFMSId.toString();
+            }
+          }
+
+          return {
+            stepNo: index + 1,
+            what: step.what || '',
+            who: whoValue,
+            how: step.how || '',
+            when: whenValue,
+            whenUnit: whenUnitValue,
+            whenDays: whenDaysValue,
+            whenHours: whenHoursValue,
+            whenType: whenTypeValue,
+            dependentOnStep: step.dependentOnStep !== undefined && step.dependentOnStep !== null ? step.dependentOnStep : undefined,
+            dependentDelay: step.dependentDelay !== undefined && step.dependentDelay !== null ? step.dependentDelay : undefined,
+            dependentDelayUnit: step.dependentDelayUnit || undefined,
+            requiresChecklist: step.requiresChecklist === true,
+            checklistItems: Array.isArray(step.checklistItems) ? step.checklistItems.map((item: any, idx: number) => ({
+              id: item.id || `item-${index}-${idx}`,
+              text: item.text || '',
+              completed: item.completed === true
+            })) : [],
+            attachments: [], // Existing attachments are kept on server
+            triggersFMSId: triggersFMSIdValue,
+            requireAttachments: step.requireAttachments === true,
+            mandatoryAttachments: step.mandatoryAttachments === true
+          };
+        });
         setSteps(loadedSteps);
         setUserSearchTerms(loadedSteps.map(() => ''));
       }
@@ -196,7 +231,7 @@ const CreateFMS: React.FC = () => {
       how: '',
       when: 1,
       whenUnit: 'days' as const,
-      whenType: insertAfterIndex !== undefined && insertAfterIndex >= 0 ? 'dependent' as const : 'fixed' as const,
+      whenType: insertAfterIndex !== undefined && insertAfterIndex >= 0 ? 'dependent' as const : (steps.length === 0 ? 'fixed' as const : 'dependent' as const),
       requiresChecklist: false,
       checklistItems: [],
       attachments: [],
@@ -205,7 +240,7 @@ const CreateFMS: React.FC = () => {
     };
 
     if (insertAfterIndex !== undefined) {
-      // Insert step at specific position
+      // Insert step at specific position (after the index)
       const newSteps = [...steps];
       const newUserSearchTerms = [...userSearchTerms];
       
@@ -217,6 +252,16 @@ const CreateFMS: React.FC = () => {
         step.stepNo = index + 1;
       });
 
+      // Update dependent step references if needed
+      newSteps.forEach((step, index) => {
+        if (step.whenType === 'dependent' && step.dependentOnStep) {
+          // If dependent step was after the insertion point, adjust it
+          if (step.dependentOnStep > insertAfterIndex + 1) {
+            step.dependentOnStep = step.dependentOnStep + 1;
+          }
+        }
+      });
+
       setSteps(newSteps);
       setUserSearchTerms(newUserSearchTerms);
     } else {
@@ -224,6 +269,42 @@ const CreateFMS: React.FC = () => {
       setSteps([...steps, newStep]);
       setUserSearchTerms(prev => [...prev, '']);
     }
+  };
+
+  const addStepAtBeginning = () => {
+    const newStep: Step = {
+      stepNo: 1,
+      what: '',
+      who: '',
+      how: '',
+      when: 1,
+      whenUnit: 'days' as const,
+      whenType: 'fixed' as const,
+      requiresChecklist: false,
+      checklistItems: [],
+      attachments: [],
+      requireAttachments: false,
+      mandatoryAttachments: false
+    };
+
+    const newSteps = [newStep, ...steps];
+    const newUserSearchTerms = ['', ...userSearchTerms];
+    
+    // Update step numbers
+    newSteps.forEach((step, index) => {
+      step.stepNo = index + 1;
+    });
+
+    // Update dependent step references - all existing steps now have stepNo + 1
+    newSteps.forEach((step, index) => {
+      if (step.whenType === 'dependent' && step.dependentOnStep && index > 0) {
+        // Adjust dependent step numbers for existing steps
+        step.dependentOnStep = step.dependentOnStep + 1;
+      }
+    });
+
+    setSteps(newSteps);
+    setUserSearchTerms(newUserSearchTerms);
   };
 
   const removeStep = (index: number) => {
@@ -634,16 +715,41 @@ const CreateFMS: React.FC = () => {
                 <p className="text-sm text-[var(--color-textSecondary)]">{steps.length} step{steps.length !== 1 ? 's' : ''} configured</p>
               </div>
             </div>
-            <button
-              onClick={() => addStep()}
-              className="px-4 py-2 border border-[var(--color-border)] text-[var(--color-text)] rounded-lg hover:bg-[var(--color-background)] flex items-center gap-2 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Add Step
-            </button>
+            <div className="flex items-center gap-2">
+              {steps.length > 0 && (
+                <button
+                  onClick={addStepAtBeginning}
+                  className="px-4 py-2 border border-[var(--color-border)] text-[var(--color-text)] rounded-lg hover:bg-[var(--color-background)] flex items-center gap-2 transition-colors text-sm"
+                  title="Add step at the beginning"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add at Start
+                </button>
+              )}
+              <button
+                onClick={() => addStep()}
+                className="px-4 py-2 border border-[var(--color-border)] text-[var(--color-text)] rounded-lg hover:bg-[var(--color-background)] flex items-center gap-2 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add Step
+              </button>
+            </div>
           </div>
 
           <div className="space-y-4">
+            {/* Add Step at Beginning Button */}
+            {steps.length > 0 && (
+              <div className="flex items-center justify-center py-2">
+                <button
+                  onClick={addStepAtBeginning}
+                  className="px-4 py-2 border-2 border-dashed border-[var(--color-border)] rounded-xl text-[var(--color-textSecondary)] hover:text-[var(--color-text)] hover:border-[var(--color-primary)]/50 hover:bg-[var(--color-primary)]/5 transition-all duration-200 flex items-center gap-2 text-sm"
+                  title="Add step at the beginning"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Step at Beginning</span>
+                </button>
+              </div>
+            )}
             {steps.map((step, index) => (
               <React.Fragment key={index}>
                 <StepCard

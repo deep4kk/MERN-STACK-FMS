@@ -338,8 +338,22 @@ router.get('/:fmsId', authenticateToken, async (req, res) => {
   }
 });
 
-// Update FMS template - Super Admin only
-router.put('/:id', authenticateToken, isSuperAdmin, upload.array('files', 10), async (req, res) => {
+// Update FMS template - Allow admins and superadmins
+const canEditFMS = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Authentication required' });
+  }
+  if (req.user.role === 'superadmin' || req.user.role === 'admin') {
+    return next();
+  }
+  // Also allow users with canAssignTasks permission
+  if (req.user.permissions && req.user.permissions.canAssignTasks) {
+    return next();
+  }
+  return res.status(403).json({ success: false, message: 'Access denied. You do not have permission to edit FMS templates.' });
+};
+
+router.put('/:id', authenticateToken, canEditFMS, upload.array('files', 10), async (req, res) => {
   try {
     const {
       fmsName,
@@ -534,7 +548,19 @@ router.put('/:id', authenticateToken, isSuperAdmin, upload.array('files', 10), a
     res.json({ success: true, message: 'FMS template updated successfully', fms: updatedFms });
   } catch (error) {
     console.error('Update FMS error:', error);
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    // Provide more detailed error information
+    const errorMessage = error.message || 'Unknown error occurred';
+    console.error('Error details:', {
+      message: errorMessage,
+      stack: error.stack,
+      body: req.body,
+      params: req.params
+    });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error while updating FMS template', 
+      error: errorMessage 
+    });
   }
 });
 
