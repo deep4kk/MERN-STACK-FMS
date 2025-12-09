@@ -723,48 +723,46 @@ router.get('/person-wise-assignments', auth, async (req, res) => {
             return res.status(403).json({ message: 'Only Super Admins can access this report' });
         }
 
-        // Get all checklist templates with their assignments
+        // Get all checklist templates with their assignments (without lean for better populate support)
         const templates = await ChecklistTemplate.find({ status: 'active' })
-            .populate('assignedTo', 'username email department')
-            .lean();
+            .populate('assignedTo', 'username email department');
 
         // Get all checklist occurrences to count actual assignments
         const occurrences = await ChecklistOccurrence.find({})
-            .populate('templateId', 'name frequency')
-            .populate('assignedTo', 'username email department')
-            .lean();
+            .populate('templateId', 'name frequency');
 
         // Group by person
         const personWiseData = {};
 
-        templates.forEach(template => {
+        for (const template of templates) {
             try {
-                // Handle both populated and non-populated assignedTo
+                // Handle assignedTo - could be populated object or ObjectId
                 const assignedTo = template.assignedTo;
                 
-                // Skip if assignedTo is null, undefined, or a string (unpopulated ObjectId)
+                // Skip if assignedTo is null or undefined
                 if (!assignedTo) {
-                    return;
+                    continue;
                 }
                 
-                if (typeof assignedTo === 'string') {
-                    return;
+                // Get user ID - handle both populated and non-populated
+                let userId;
+                if (assignedTo._id) {
+                    userId = assignedTo._id.toString();
+                } else if (typeof assignedTo === 'object' && assignedTo.toString) {
+                    userId = assignedTo.toString();
+                } else if (typeof assignedTo === 'string') {
+                    // Unpopulated ObjectId string - skip this template
+                    continue;
+                } else {
+                    continue;
                 }
-
-                // When using .lean(), _id is a plain object, not a Mongoose document
-                // Handle both ObjectId and populated object
-                const userId = assignedTo._id 
-                    ? (typeof assignedTo._id === 'object' ? assignedTo._id.toString() : assignedTo._id)
-                    : (assignedTo.toString ? assignedTo.toString() : null);
                 
-                if (!userId) {
-                    return;
-                }
-                
+                // Get user details
                 const username = assignedTo.username || 'Unknown';
                 const email = assignedTo.email || '';
                 const department = assignedTo.department || 'General';
 
+                // Initialize person data if not exists
                 if (!personWiseData[userId]) {
                     personWiseData[userId] = {
                         userId,
@@ -775,33 +773,36 @@ router.get('/person-wise-assignments', auth, async (req, res) => {
                     };
                 }
 
-                // Count occurrences for this template
-                if (!template._id) {
-                    return; // Skip if template has no _id
+                // Get template ID
+                const templateId = template._id ? template._id.toString() : null;
+                if (!templateId) {
+                    continue;
                 }
-                const templateIdStr = typeof template._id === 'object' 
-                    ? template._id.toString() 
-                    : String(template._id);
-                const occurrenceCount = occurrences.filter(occ => {
-                    if (!occ.templateId) return false;
-                    try {
-                        // Handle both populated and non-populated templateId
-                        let occTemplateId;
-                        if (occ.templateId._id) {
-                            occTemplateId = typeof occ.templateId._id === 'object' 
-                                ? occ.templateId._id.toString() 
-                                : String(occ.templateId._id);
-                        } else {
-                            occTemplateId = occ.templateId.toString ? occ.templateId.toString() : String(occ.templateId);
-                        }
-                        return occTemplateId === templateIdStr;
-                    } catch (err) {
-                        return false;
-                    }
-                }).length;
 
+                // Count occurrences for this template
+                let occurrenceCount = 0;
+                for (const occ of occurrences) {
+                    if (!occ.templateId) continue;
+                    
+                    let occTemplateId;
+                    if (occ.templateId._id) {
+                        occTemplateId = occ.templateId._id.toString();
+                    } else if (typeof occ.templateId === 'object' && occ.templateId.toString) {
+                        occTemplateId = occ.templateId.toString();
+                    } else if (typeof occ.templateId === 'string') {
+                        occTemplateId = occ.templateId;
+                    } else {
+                        continue;
+                    }
+                    
+                    if (occTemplateId === templateId) {
+                        occurrenceCount++;
+                    }
+                }
+
+                // Add checklist to person's list
                 personWiseData[userId].checklists.push({
-                    templateId: templateIdStr,
+                    templateId: templateId,
                     templateName: template.name || 'Unnamed Checklist',
                     frequency: template.frequency || 'monthly',
                     category: template.category || 'General',
@@ -812,7 +813,7 @@ router.get('/person-wise-assignments', auth, async (req, res) => {
                 console.warn(`Error processing template ${template._id}:`, err.message);
                 // Continue with next template
             }
-        });
+        }
 
         // Convert to array and sort by username
         const result = Object.values(personWiseData)
