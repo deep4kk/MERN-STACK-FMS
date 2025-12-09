@@ -49,7 +49,8 @@ import {
   GripVertical,
   RotateCcw,
   Save,
-  FileText
+  FileText,
+  FileSpreadsheet
 } from 'lucide-react';
 
 // Modern AMG Logo Component with Glassmorphism
@@ -226,6 +227,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { section: 'Checklists', icon: ListTodo, label: 'Pending Checklists', path: '/pending-checklists', highlight: true },
     { section: 'Checklists', icon: Calendar, label: 'Checklist Calendar', path: '/checklist-calendar', highlight: true },
     { section: 'Checklists', icon: Users, label: 'Person Dashboard', path: '/checklist-person-dashboard', highlight: true },
+    { section: 'Checklists', icon: FileSpreadsheet, label: 'Checklist Master', path: '/checklist-master', requireAdmin: true, highlight: true },
     { section: 'Checklists', icon: Settings, label: 'Manage Checklist Categories', path: '/checklist-categories', requireAdmin: true, highlight: true },
 
     // Tasks Section

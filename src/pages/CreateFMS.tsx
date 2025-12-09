@@ -76,11 +76,6 @@ const CreateFMS: React.FC = () => {
   });
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
-  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
-  const initialFormState = useRef<string>('');
-  const isInitialLoad = useRef(true);
 
   // Track initial form state
   useEffect(() => {

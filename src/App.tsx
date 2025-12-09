@@ -40,6 +40,7 @@ import ChecklistTemplateForm from './pages/ChecklistTemplateForm';
 import ChecklistOccurrenceDetail from './pages/ChecklistOccurrenceDetail';
 import PendingChecklists from './pages/PendingChecklists';
 import ChecklistPersonDashboard from './pages/ChecklistPersonDashboard';
+import ChecklistMaster from './pages/ChecklistMaster';
 import FMSDashboard from './pages/FMSDashboard';
 import SuperAdminManagement from './pages/SuperAdminManagement';
 import Profile from './pages/Profile';
@@ -87,6 +88,7 @@ function AppContent() {
                   <Route path="/checklist-occurrence/:id" element={<ProtectedRoute><ChecklistOccurrenceDetail /></ProtectedRoute>} />
                   <Route path="/pending-checklists" element={<ProtectedRoute><PendingChecklists /></ProtectedRoute>} />
                   <Route path="/checklist-person-dashboard" element={<ProtectedRoute><ChecklistPersonDashboard /></ProtectedRoute>} />
+                  <Route path="/checklist-master" element={<ProtectedRoute requireAdmin><ChecklistMaster /></ProtectedRoute>} />
                   <Route path="/help-tickets" element={<ProtectedRoute><HelpTickets /></ProtectedRoute>} />
                   <Route path="/admin-help-tickets" element={<ProtectedRoute requiredPermissions={['canViewAllComplaints']}><AdminHelpTickets /></ProtectedRoute>} />
                   <Route path="/complaints" element={<ProtectedRoute requiredPermissions={['canRaiseComplaints']}><Complaints /></ProtectedRoute>} />

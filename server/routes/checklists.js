@@ -716,6 +716,70 @@ router.post('/:id/submit', auth, async (req, res) => {
     }
 });
 
+// Get all checklists for Checklist Master view - with all necessary data
+router.get('/master', auth, async (req, res) => {
+    try {
+        const userRole = req.user.role;
+        
+        // Only admin, superadmin, and PC can access this
+        if (!['admin', 'superadmin', 'pc'].includes(userRole)) {
+            return res.status(403).json({ message: 'Access denied. Only Admin, Super Admin, and PC can access this view.' });
+        }
+
+        // Get all checklist occurrences with populated data
+        const checklists = await ChecklistOccurrence.find({})
+            .populate('templateId', 'name category frequency')
+            .populate('assignedTo', 'username email department')
+            .populate('assignedBy', 'username email')
+            .populate('completedBy', 'username email')
+            .sort({ dueDate: -1 })
+            .lean();
+
+        // Transform data for frontend
+        const transformedChecklists = checklists.map(checklist => {
+            const template = checklist.templateId;
+            return {
+                _id: checklist._id,
+                templateName: checklist.templateName || (template?.name || 'Unknown'),
+                category: checklist.category || (template?.category || 'General'),
+                frequency: template?.frequency || 'N/A',
+                assignedTo: checklist.assignedTo ? {
+                    _id: checklist.assignedTo._id,
+                    username: checklist.assignedTo.username || 'Unknown',
+                    email: checklist.assignedTo.email || '',
+                    department: checklist.assignedTo.department || 'General'
+                } : null,
+                assignedBy: checklist.assignedBy ? {
+                    _id: checklist.assignedBy._id,
+                    username: checklist.assignedBy.username || 'Unknown',
+                    email: checklist.assignedBy.email || ''
+                } : null,
+                dueDate: checklist.dueDate,
+                status: checklist.status,
+                progressPercentage: checklist.progressPercentage || 0,
+                completedAt: checklist.completedAt,
+                completedBy: checklist.completedBy ? {
+                    _id: checklist.completedBy._id,
+                    username: checklist.completedBy.username || 'Unknown'
+                } : null,
+                createdAt: checklist.createdAt,
+                updatedAt: checklist.updatedAt,
+                itemsCount: checklist.items ? checklist.items.length : 0,
+                completedItemsCount: checklist.items ? checklist.items.filter((item) => item.status === 'done' || item.checked).length : 0
+            };
+        });
+
+        res.json(transformedChecklists);
+    } catch (error) {
+        console.error('Error fetching checklist master data:', error);
+        res.status(500).json({ 
+            message: 'Server error', 
+            error: error.message,
+            stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+        });
+    }
+});
+
 // Get all checklists grouped by person with frequencies (all-time) - Super Admin only
 router.get('/person-wise-assignments', auth, async (req, res) => {
     try {
