@@ -398,6 +398,22 @@ router.put('/:id', authenticateToken, isSuperAdmin, upload.array('files', 10), a
         return res.status(400).json({ success: false, message: 'At least one step is required' });
       }
 
+      // Preserve existing attachments by matching steps
+      // Store existing attachments by index (for in-place edits) and by content (for reordered steps)
+      const existingAttachmentsByIndex = [];
+      const existingAttachmentsByContent = new Map();
+      if (fms.steps && fms.steps.length > 0) {
+        fms.steps.forEach((existingStep, oldIndex) => {
+          // Store by index for direct matching
+          if (existingStep.attachments && existingStep.attachments.length > 0) {
+            existingAttachmentsByIndex[oldIndex] = existingStep.attachments;
+            // Also store by content for reordered steps
+            const contentKey = `${existingStep.what || ''}_${existingStep.how || ''}_${String(existingStep.who || '')}`;
+            existingAttachmentsByContent.set(contentKey, existingStep.attachments);
+          }
+        });
+      }
+
       // Validate and convert step data
       parsedSteps = parsedSteps.map((step, index) => {
         // Set stepNo to ensure it's present (this was missing and causing the 500 error)
@@ -463,28 +479,44 @@ router.put('/:id', authenticateToken, isSuperAdmin, upload.array('files', 10), a
         step.requireAttachments = step.requireAttachments === true || step.requireAttachments === 'true';
         step.mandatoryAttachments = step.mandatoryAttachments === true || step.mandatoryAttachments === 'true';
 
+        // Preserve existing attachments - try by index first (for in-place edits), then by content (for reordered steps)
+        let existingAttachments = existingAttachmentsByIndex[index];
+        if (!existingAttachments || existingAttachments.length === 0) {
+          // Try matching by content if index match didn't work
+          const contentKey = `${step.what || ''}_${step.how || ''}_${String(step.who || '')}`;
+          existingAttachments = existingAttachmentsByContent.get(contentKey);
+        }
+        
+        if (existingAttachments && existingAttachments.length > 0) {
+          step.attachments = [...existingAttachments];
+        } else {
+          step.attachments = [];
+        }
+
         return step;
       });
 
-      // Process file uploads if any
+      // Process file uploads if any - merge with existing attachments
       if (req.files && req.files.length > 0) {
         const fileMap = {};
         req.files.forEach(file => {
           const stepIndex = parseInt(file.fieldname.split('-')[1]);
-          if (!fileMap[stepIndex]) fileMap[stepIndex] = [];
-          fileMap[stepIndex].push({
-            filename: file.filename,
-            originalName: file.originalname,
-            path: file.path,
-            size: file.size,
-            uploadedBy: req.user._id,
-            uploadedAt: new Date()
-          });
+          if (!isNaN(stepIndex) && stepIndex >= 0) {
+            if (!fileMap[stepIndex]) fileMap[stepIndex] = [];
+            fileMap[stepIndex].push({
+              filename: file.filename,
+              originalName: file.originalname,
+              path: file.path,
+              size: file.size,
+              uploadedBy: req.user._id,
+              uploadedAt: new Date()
+            });
+          }
         });
 
         parsedSteps.forEach((step, index) => {
-          if (fileMap[index]) {
-            // Merge new files with existing attachments or replace if needed
+          if (fileMap[index] && fileMap[index].length > 0) {
+            // Merge new files with existing attachments
             step.attachments = [...(step.attachments || []), ...fileMap[index]];
           }
         });

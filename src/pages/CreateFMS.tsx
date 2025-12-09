@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Save, ArrowLeft, FileText, Layers, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Save, ArrowLeft, FileText, Layers } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
@@ -77,136 +77,6 @@ const CreateFMS: React.FC = () => {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
-  // Track initial form state
-  useEffect(() => {
-    if (isInitialLoad.current) {
-      if (!isEditMode) {
-        // For new forms, initial state is empty
-        initialFormState.current = JSON.stringify({
-          fmsName: '',
-          category: 'General',
-          steps: [{
-            stepNo: 1,
-            what: '',
-            who: '',
-            how: '',
-            when: 1,
-            whenUnit: 'days',
-            whenType: 'fixed',
-            requiresChecklist: false,
-            checklistItems: [],
-            attachments: [],
-            requireAttachments: false,
-            mandatoryAttachments: false
-          }],
-          frequency: 'one-time',
-          frequencySettings: {
-            includeSunday: true,
-            shiftSundayToMonday: true,
-            weeklyDays: [],
-            monthlyDay: 1,
-            yearlyDuration: 3
-          }
-        });
-        isInitialLoad.current = false;
-      }
-    }
-  }, [isEditMode]);
-
-  // Update initial state after loading edit data
-  useEffect(() => {
-    if (isEditMode && fmsName && steps.length > 0 && isInitialLoad.current && !loading) {
-      // Use setTimeout to ensure all state updates are complete
-      const timer = setTimeout(() => {
-        initialFormState.current = JSON.stringify({
-          fmsName,
-          category,
-          steps: steps.map(s => ({
-            stepNo: s.stepNo,
-            what: s.what,
-            who: s.who,
-            how: s.how,
-            when: s.when,
-            whenUnit: s.whenUnit,
-            whenDays: s.whenDays,
-            whenHours: s.whenHours,
-            whenType: s.whenType,
-            dependentOnStep: s.dependentOnStep,
-            dependentDelay: s.dependentDelay,
-            dependentDelayUnit: s.dependentDelayUnit,
-            requiresChecklist: s.requiresChecklist,
-            checklistItems: s.checklistItems,
-            requireAttachments: s.requireAttachments,
-            mandatoryAttachments: s.mandatoryAttachments,
-            triggersFMSId: s.triggersFMSId
-          })),
-          frequency,
-          frequencySettings
-        });
-        setHasUnsavedChanges(false);
-        isInitialLoad.current = false;
-      }, 100);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isEditMode, fmsName, category, steps, frequency, frequencySettings, loading]);
-
-  // Check for unsaved changes
-  useEffect(() => {
-    if (!initialFormState.current || isInitialLoad.current) return;
-
-    const currentState = JSON.stringify({
-      fmsName,
-      category,
-      steps: steps.map(s => ({
-        stepNo: s.stepNo,
-        what: s.what,
-        who: s.who,
-        how: s.how,
-        when: s.when,
-        whenUnit: s.whenUnit,
-        whenDays: s.whenDays,
-        whenHours: s.whenHours,
-        whenType: s.whenType,
-        dependentOnStep: s.dependentOnStep,
-        dependentDelay: s.dependentDelay,
-        dependentDelayUnit: s.dependentDelayUnit,
-        requiresChecklist: s.requiresChecklist,
-        checklistItems: s.checklistItems,
-        requireAttachments: s.requireAttachments,
-        mandatoryAttachments: s.mandatoryAttachments,
-        triggersFMSId: s.triggersFMSId
-      })),
-      frequency,
-      frequencySettings
-    });
-
-    setHasUnsavedChanges(currentState !== initialFormState.current);
-  }, [fmsName, category, steps, frequency, frequencySettings]);
-
-  // Warn before leaving page
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-        return e.returnValue;
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
-
-  // Handle navigation attempts
-  const handleNavigation = useCallback((targetPath: string) => {
-    if (hasUnsavedChanges) {
-      setPendingNavigation(() => () => navigate(targetPath));
-      setShowUnsavedDialog(true);
-    } else {
-      navigate(targetPath);
-    }
-  }, [hasUnsavedChanges, navigate]);
 
   useEffect(() => {
     fetchUsers();
@@ -661,33 +531,6 @@ const CreateFMS: React.FC = () => {
 
       if (response.data.success) {
         toast.success(isEditMode ? 'FMS template updated successfully!' : 'FMS template created successfully!');
-        // Update initial state to current state after successful save
-        initialFormState.current = JSON.stringify({
-          fmsName,
-          category,
-          steps: steps.map(s => ({
-            stepNo: s.stepNo,
-            what: s.what,
-            who: s.who,
-            how: s.how,
-            when: s.when,
-            whenUnit: s.whenUnit,
-            whenDays: s.whenDays,
-            whenHours: s.whenHours,
-            whenType: s.whenType,
-            dependentOnStep: s.dependentOnStep,
-            dependentDelay: s.dependentDelay,
-            dependentDelayUnit: s.dependentDelayUnit,
-            requiresChecklist: s.requiresChecklist,
-            checklistItems: s.checklistItems,
-            requireAttachments: s.requireAttachments,
-            mandatoryAttachments: s.mandatoryAttachments,
-            triggersFMSId: s.triggersFMSId
-          })),
-          frequency,
-          frequencySettings
-        });
-        setHasUnsavedChanges(false);
         navigate('/fms-templates');
       } else {
         toast.error(response.data.message || `Failed to ${isEditMode ? 'update' : 'create'} FMS template`);
@@ -701,22 +544,6 @@ const CreateFMS: React.FC = () => {
     }
   };
 
-  const handleDiscardChanges = () => {
-    setShowUnsavedDialog(false);
-    setHasUnsavedChanges(false);
-    if (pendingNavigation) {
-      pendingNavigation();
-      setPendingNavigation(null);
-    } else {
-      navigate('/fms-templates');
-    }
-  };
-
-  const handleSaveAndExit = async () => {
-    setShowUnsavedDialog(false);
-    await handleSubmit();
-    // Navigation will happen in handleSubmit after successful save
-  };
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--color-background)' }}>
@@ -726,7 +553,7 @@ const CreateFMS: React.FC = () => {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => handleNavigation('/fms-templates')}
+                onClick={() => navigate('/fms-templates')}
                 className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
                 title="Go back"
               >
@@ -870,77 +697,24 @@ const CreateFMS: React.FC = () => {
         </div>
 
         {/* Bottom Actions */}
-        <div className="flex items-center justify-between pt-6 border-t border-[var(--color-border)]">
-          {hasUnsavedChanges && (
-            <div className="flex items-center gap-2 text-sm text-[var(--color-warning)]">
-              <AlertTriangle className="w-4 h-4" />
-              <span>You have unsaved changes</span>
-            </div>
-          )}
-          <div className="flex items-center gap-4 ml-auto">
-            <button
-              onClick={() => handleNavigation('/fms-templates')}
-              className="px-6 py-3 border border-[var(--color-border)] text-[var(--color-text)] rounded-lg hover:bg-[var(--color-background)] transition-colors"
-            >
-              {hasUnsavedChanges ? 'Discard' : 'Cancel'}
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={loading}
-              className="px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 flex items-center gap-2 disabled:opacity-50 transition-opacity min-w-[160px] justify-center"
-            >
-              <Save className="w-4 h-4" />
-              {loading ? 'Saving...' : 'Save Template'}
-            </button>
-          </div>
+        <div className="flex items-center justify-end gap-4 pt-6 border-t border-[var(--color-border)]">
+          <button
+            onClick={() => navigate('/fms-templates')}
+            className="px-6 py-3 border border-[var(--color-border)] text-[var(--color-text)] rounded-lg hover:bg-[var(--color-background)] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 flex items-center gap-2 disabled:opacity-50 transition-opacity min-w-[160px] justify-center"
+          >
+            <Save className="w-4 h-4" />
+            {loading ? 'Saving...' : 'Save Template'}
+          </button>
         </div>
       </main>
 
-      {/* Unsaved Changes Dialog */}
-      {showUnsavedDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-[var(--color-surface)] rounded-xl shadow-xl w-full max-w-md border border-[var(--color-border)]">
-            <div className="flex items-center justify-between p-6 border-b border-[var(--color-border)]">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 rounded-lg bg-[var(--color-warning)]/10">
-                  <AlertTriangle className="w-6 h-6 text-[var(--color-warning)]" />
-                </div>
-                <h2 className="text-xl font-semibold text-[var(--color-text)]">
-                  Unsaved Changes
-                </h2>
-              </div>
-            </div>
-
-            <div className="p-6">
-              <p className="text-sm text-[var(--color-textSecondary)] mb-4">
-                You have unsaved changes. What would you like to do?
-              </p>
-            </div>
-
-            <div className="flex justify-end space-x-3 p-6 border-t border-[var(--color-border)]">
-              <button
-                onClick={handleDiscardChanges}
-                className="px-4 py-2 text-sm font-medium rounded-lg transition-colors border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-background)]"
-              >
-                Discard Changes
-              </button>
-              <button
-                onClick={() => setShowUnsavedDialog(false)}
-                className="px-4 py-2 text-sm font-medium rounded-lg transition-colors border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-background)]"
-              >
-                Continue Editing
-              </button>
-              <button
-                onClick={handleSaveAndExit}
-                disabled={loading}
-                className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors bg-[var(--color-primary)] hover:opacity-90 disabled:opacity-50"
-              >
-                {loading ? 'Saving...' : 'Save & Exit'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

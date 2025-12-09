@@ -728,9 +728,16 @@ router.get('/master', auth, async (req, res) => {
 
         // Get all checklist occurrences with populated data
         const checklists = await ChecklistOccurrence.find({})
-            .populate('templateId', 'name category frequency')
+            .populate({
+                path: 'templateId',
+                select: 'name category frequency createdBy',
+                populate: {
+                    path: 'createdBy',
+                    select: 'username email'
+                }
+            })
             .populate('assignedTo', 'username email department')
-            .populate('assignedBy', 'username email')
+            .populate('submittedBy', 'username email')
             .populate('completedBy', 'username email')
             .sort({ dueDate: -1 })
             .lean();
@@ -738,6 +745,11 @@ router.get('/master', auth, async (req, res) => {
         // Transform data for frontend
         const transformedChecklists = checklists.map(checklist => {
             const template = checklist.templateId;
+            // Get assignedBy from template's createdBy or use submittedBy as fallback
+            const assignedBy = (template?.createdBy && typeof template.createdBy === 'object') 
+                ? template.createdBy 
+                : (checklist.submittedBy || null);
+            
             return {
                 _id: checklist._id,
                 templateName: checklist.templateName || (template?.name || 'Unknown'),
@@ -749,10 +761,10 @@ router.get('/master', auth, async (req, res) => {
                     email: checklist.assignedTo.email || '',
                     department: checklist.assignedTo.department || 'General'
                 } : null,
-                assignedBy: checklist.assignedBy ? {
-                    _id: checklist.assignedBy._id,
-                    username: checklist.assignedBy.username || 'Unknown',
-                    email: checklist.assignedBy.email || ''
+                assignedBy: assignedBy ? {
+                    _id: assignedBy._id || assignedBy,
+                    username: assignedBy.username || 'Unknown',
+                    email: assignedBy.email || ''
                 } : null,
                 dueDate: checklist.dueDate,
                 status: checklist.status,
